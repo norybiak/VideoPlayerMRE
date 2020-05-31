@@ -79,7 +79,7 @@ export default class App
                 {
                     meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
                     materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id
-				},
+                },
                 collider: 
                 { 
                     geometry: { shape: MRE.ColliderType.Auto}
@@ -89,9 +89,9 @@ export default class App
                     local: 
                     {
                         position: { x: 0, y: 0, z: 0 },
-					}
-				}
-			}
+                    }
+                }
+            }
         });
     }
 
@@ -143,7 +143,7 @@ export default class App
 
         this.clickText = MRE.Actor.Create(this.context, 
         {
-			actor: {
+            actor: {
                 name: 'clickText',
                 parentId: this.videoPlayerActor.id,
                 appearance:
@@ -162,14 +162,14 @@ export default class App
                     local: 
                     {
                         position: { x: 0, y: 0, z: -0.01 }
-					}
-				}
-			}
+                    }
+                }
+            }
         });
 
         this.errorText = MRE.Actor.Create(this.context, 
         {
-			actor: {
+            actor: {
                 name: 'errorText',
                 parentId: this.videoPlayerActor.id,
                 appearance: { enabled: false },
@@ -186,9 +186,9 @@ export default class App
                     local: 
                     {
                         position: { x: 0, y: 0, z: -0.01 }
-					}
-				}
-			}
+                    }
+                }
+            }
         });
     }
 
