@@ -83,13 +83,6 @@ export default class App
                 collider: 
                 { 
                     geometry: { shape: MRE.ColliderType.Auto}
-                },
-                transform: 
-                {
-                    local: 
-                    {
-                        position: { x: 0, y: 0, z: 0 },
-                    }
                 }
             }
         });
@@ -143,7 +136,8 @@ export default class App
 
         this.clickText = MRE.Actor.Create(this.context, 
         {
-            actor: {
+            actor: 
+            {
                 name: 'clickText',
                 parentId: this.videoPlayerActor.id,
                 appearance:
@@ -169,7 +163,8 @@ export default class App
 
         this.errorText = MRE.Actor.Create(this.context, 
         {
-            actor: {
+            actor: 
+            {
                 name: 'errorText',
                 parentId: this.videoPlayerActor.id,
                 appearance: { enabled: false },
