@@ -1,5 +1,4 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
-import Server from './server';
 
 import URL from 'url';
 import fetch from 'node-fetch';
@@ -201,12 +200,12 @@ export default class App
 
 		const sharedMat = this.assets.createMaterial('ControlsMaterial', 
 		{
-			mainTextureId: this.assets.createTexture('icons', { uri: `${Server.baseUrl}/icons.png` }).id,
+			mainTextureId: this.assets.createTexture('icons', { uri: `${this.baseUrl}/icons.png` }).id,
 			emissiveColor: MRE.Color3.White(),
 			alphaMode: MRE.AlphaMode.Blend
 		});
 
-		await this.assets.loadGltf(`${Server.baseUrl}/videoPlayerControls.glb`);
+		await this.assets.loadGltf(`${this.baseUrl}/videoPlayerControls.glb`);
 
 		this.createButtonActor("PlayButton", -8, sharedMat);
 		this.createButtonActor("PauseButton", -8, sharedMat, false);
