@@ -9,10 +9,9 @@ process.on('uncaughtException', (err) => console.log('uncaughtException', err));
 process.on('unhandledRejection', (reason) => console.log('unhandledRejection', reason));
 
  // Start listening for connections, and serve static files
+ // Note that process.env.BASE_URL/PORT variables will automatically be used if defined in the .env file
 const server = new WebHost({
-   baseDir: resolvePath(__dirname, '../public'),
-   baseUrl: "http://localhost:3901",
-   port: 3901
+   baseDir: resolvePath(__dirname, '../public')
 });
 
 // Handle new application sessions
