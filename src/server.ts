@@ -15,6 +15,6 @@ const server = new WebHost({
 });
 
 // Handle new application sessions
-server.adapter.onConnection((context, params) => new App(context, server.baseUrl, params));
+server.adapter.onConnection((context, params) => new App(context, params));
 
 export default server;

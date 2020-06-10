@@ -1,4 +1,5 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
+import Server from './server';
 
 import URL from 'url';
 import fetch from 'node-fetch';
@@ -6,6 +7,15 @@ import fetch from 'node-fetch';
 const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
 const BUTTON_SCALE = 0.03;
+
+interface Admins
+{
+	videoPlayer?: MRE.Actor,
+	controls?: MRE.Actor,
+	videoInstance?: MRE.MediaInstance,
+	isVideoPlayerHovered: boolean,
+	isControlsHovered: boolean
+}
 
 /**
  * The main class of this app. All the logic goes here.
@@ -15,222 +25,193 @@ export default class App
 	private assets: MRE.AssetContainer;
 	private videos: MRE.AssetContainer;
 
-	private videoPlayerActor: MRE.Actor;
-	private isVideoPlayerHovered: boolean = false;
+	private videoPlayer: MRE.Actor;
 
-	private playerControls: MRE.Actor;
-	private playerControlButtons: { [key: string]: MRE.Actor } = {};
-	private isPlayerControlsHovered: boolean = false;
+	private admins: { [key: string]: Admins } = {};
 
 	private video: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
+
 	private isVideoPlaying: boolean;
 	private loop: boolean = false;
-	
-	private clickText: MRE.Actor;
-	private errorText: MRE.Actor;
 
-	private adminGroup: MRE.GroupMask;
-	private userGroup: MRE.GroupMask;
+	private videoPlayerMat: MRE.Material;
+	private iconMat: MRE.Material;
 
-	constructor(private context: MRE.Context, private baseUrl: string, private params: MRE.ParameterSet)
+	constructor(private context: MRE.Context, private params: MRE.ParameterSet)
 	{
 		this.videos = new MRE.AssetContainer(context);
 		this.assets = new MRE.AssetContainer(context);
 
-		this.adminGroup = new MRE.GroupMask(this.context, ['admin']);
-		this.userGroup = new MRE.GroupMask(this.context, ['user']);
-
-		this.context.onStarted(() => this.start());
-		this.context.onUserJoined((user) => this.handleUser(user));  
+		this.context.onStarted(() => this.init());
+		this.context.onUserJoined((user) => this.handleUser(user));
 	}
 
 	/**
 	 * Once the context is "started", initialize the app.
 	 */
-	private async start()
+	private async init()
 	{
-		this.createVideoPlayerActor();
-		this.createVideoPlayerBehavior();
-		this.createVideoPlayerAdminButtons();
+		this.iconMat = this.assets.createMaterial('ControlsMaterial',
+		{
+			mainTextureId: this.assets.createTexture('icons', { uri: `${Server.baseUrl}/icons.png` }).id,
+			emissiveColor: MRE.Color3.White(),
+			alphaMode: MRE.AlphaMode.Blend
+		});
+
+		this.videoPlayerMat = this.assets.createMaterial('material', { color: MRE.Color3.Black() });
 	}
 
 	private handleUser(user: MRE.User)
 	{
 		if (this.checkUserRole(user, 'moderator'))
 		{
-			user.groups.add('admin');
+			user.groups.set(['admin']);
+
+			this.admins[user.id.toString()] =
+			{
+				isControlsHovered: false,
+				isVideoPlayerHovered: false
+			};
+
+			this.createAdminVideoPlayer(user);
 		}
 		else
 		{
-			user.groups.add('default');
+			// Hack(?) that prevents the default video player from being created for the authoritative user
+			if (!this.videoPlayer)
+				this.createDefaultVideoPlayer();
 		}
 	}
 
-	private createVideoPlayerActor()
+	private createDefaultVideoPlayer()
 	{
-		this.videoPlayerActor = MRE.Actor.Create(this.context, 
+		this.videoPlayer = MRE.Actor.Create(this.context,
 		{
-			actor: 
+			actor:
 			{
 				name: 'videoPlayerActor',
-				appearance: 
+				appearance:
 				{
 					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
-					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id
+					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
+					enabled: new MRE.GroupMask(this.context, ['default'])
 				},
-				collider: 
-				{ 
+				collider:
+				{
 					geometry: { shape: MRE.ColliderType.Auto}
 				}
 			}
 		});
 	}
 
-	private async createVideoPlayerBehavior()
+	private async createAdminVideoPlayer(user: MRE.User)
 	{
-		const behavior = this.videoPlayerActor.setBehavior(MRE.ButtonBehavior);
+		const adminVideoPlayerActor = MRE.Actor.Create(this.context,
+		{
+			actor:
+			{
+				name: 'adminPlayerActor',
+				exclusiveToUser: user.id,
+				appearance:
+				{
+					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
+					materialId: this.videoPlayerMat.id
+				},
+				collider:
+				{
+					geometry: { shape: MRE.ColliderType.Auto}
+				}
+			}
+		});
+
+		this.createText(adminVideoPlayerActor.id);
+
+		const adminControlsActor = MRE.Actor.Create(this.context,
+		{
+			actor:
+			{
+				name: "playerControls",
+				exclusiveToUser: user.id,
+				appearance: { enabled: false },
+				transform: { local: { position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.01 } } }
+			}
+		});
+
+		const admin = this.admins[user.id.toString()];
+		admin.videoPlayer = adminVideoPlayerActor;
+		admin.controls = adminControlsActor;
+
+		const behavior = admin.videoPlayer.setBehavior(MRE.ButtonBehavior);
 
 		behavior.onHover('enter', (user) =>
 		{
-			if (this.checkUserRole(user, 'moderator'))
-			{            
-				this.isVideoPlayerHovered = true;
-				this.playerControlsEnabled(true);
-			}
+			admin.isVideoPlayerHovered = true;
+			admin.controls.appearance.enabled = true;
 		});
 
 		behavior.onHover('exit', (user) =>
 		{
-			if (this.checkUserRole(user, 'moderator'))
-			{  
-				this.isVideoPlayerHovered = false;
+			admin.isVideoPlayerHovered = false;
 
-				//Hack to check if player controls are hovered.
-				setTimeout(() =>
-				{
-					if (!this.isPlayerControlsHovered && !this.isVideoPlayerHovered)
-						this.playerControlsEnabled(false);
-				}, 500);
-			}
+			//Hack to check if player controls are hovered.
+			setTimeout(() =>
+			{
+				if (!admin.isVideoPlayerHovered && !admin.isControlsHovered)
+					admin.controls.appearance.enabled = false;
+			}, 500);
 		});
 
 		behavior.onClick((user) =>
 		{
 			if (this.checkUserRole(user, 'moderator'))
-			{ 
-				user.prompt("Enter Video URL", true).then((dialog) => 
+			{
+				user.prompt("Enter Video URL", true).then((dialog) =>
 				{
 					if (dialog.submitted)
 					{
 						this.parseUrl(dialog.text).then((parsedUrl) =>
 						{
-							this.clickText.appearance.enabledFor.delete('admin');
-							this.createOrUpdateVideoPlayer(parsedUrl);
+							admin.videoPlayer.findChildrenByName('ClickText', false)[0].appearance.enabled = false;
+
+							if (!parsedUrl)
+							{
+								admin.videoPlayer.findChildrenByName('ErrorText', false)[0].appearance.enabled = true;
+							}
+							else
+							{
+								this.createOrUpdateVideoPlayer(parsedUrl);
+							}
 						});
 					}
 				});
 			}
 		});
 
-		this.clickText = MRE.Actor.Create(this.context, 
-		{
-			actor: 
-			{
-				name: 'clickText',
-				parentId: this.videoPlayerActor.id,
-				appearance:
-				{
-					enabled: this.adminGroup
-				},
-				text:
-				{
-					contents: "Click to enter URL",
-					height: 0.1,
-					anchor: MRE.TextAnchorLocation.MiddleCenter,
-					color: MRE.Color3.White()
-				},
-				transform: 
-				{
-					local: 
-					{
-						position: { x: 0, y: 0, z: -0.01 }
-					}
-				}
-			}
-		});
+		await this.assets.loadGltf(`${Server.baseUrl}/videoPlayerControls.glb`);
 
-		this.errorText = MRE.Actor.Create(this.context, 
-		{
-			actor: 
-			{
-				name: 'errorText',
-				parentId: this.videoPlayerActor.id,
-				appearance: { enabled: false },
-				text:
-				{
-					contents: "Youtube \n video cannot be \n played",
-					height: 0.1,
-					anchor: MRE.TextAnchorLocation.MiddleCenter,
-					color: MRE.Color3.Red(),
-					justify: MRE.TextJustify.Center
-				},
-				transform: 
-				{
-					local: 
-					{
-						position: { x: 0, y: 0, z: -0.01 }
-					}
-				}
-			}
-		});
-	}
-
-	private async createVideoPlayerAdminButtons()
-	{
-		this.playerControls = MRE.Actor.Create(this.context, 
-		{
-			actor: 
-			{
-				name: "playerControls",
-				appearance: { enabled: false },
-				transform: { local: { position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.01 } } }
-			}
-		});
-
-		const sharedMat = this.assets.createMaterial('ControlsMaterial', 
-		{
-			mainTextureId: this.assets.createTexture('icons', { uri: `${this.baseUrl}/icons.png` }).id,
-			emissiveColor: MRE.Color3.White(),
-			alphaMode: MRE.AlphaMode.Blend
-		});
-
-		await this.assets.loadGltf(`${this.baseUrl}/videoPlayerControls.glb`);
-
-		this.createButtonActor("PlayButton", -8, sharedMat);
-		this.createButtonActor("PauseButton", -8, sharedMat, false);
-		this.createButtonActor("StopButton",  -6, sharedMat);
-		this.createButtonActor("RestartButton", -4, sharedMat);
+		this.createButtonActor(admin, "PlayButton", -8);
+		this.createButtonActor(admin, "PauseButton", -8, false);
+		this.createButtonActor(admin, "StopButton",  -6);
+		this.createButtonActor(admin, "RestartButton", -4);
 
 		//Looping is currently broken
 		//this.createButtonActor("LoopButton", 8, sharedMat, false);
 		//this.createButtonActor("LoopOffButton", 8, sharedMat);
-
-		this.setInitialPlayPauseButtonState();
 	}
 
-	private createButtonActor(theName: string, xOffset: number, sharedMat: MRE.Material, isEnabled: boolean = true)
+	private createButtonActor(admin: Admins, theName: string, xOffset: number, isEnabled: boolean = true)
 	{
-		const actor = MRE.Actor.Create(this.context,
+		const buttonActor = MRE.Actor.Create(this.context,
 		{
 			actor:
 			{
 				name: theName,
-				parentId: this.playerControls.id,
+				parentId: admin.controls.id,
 				appearance:
 				{
 					meshId: this.assets.meshes.find(m => m.name === theName).id,
-					materialId: sharedMat.id,
+					materialId: this.iconMat.id,
 					enabled: isEnabled
 				},
 				collider: { geometry: { shape: MRE.ColliderType.Box } },
@@ -246,23 +227,72 @@ export default class App
 			}
 		});
 
-		this.playerControlButtons[actor.name] = actor;
-
-		let behavior = actor.setBehavior(MRE.ButtonBehavior);
-		behavior.onHover('enter', () =>
+		const behavior = buttonActor.setBehavior(MRE.ButtonBehavior);
+		behavior.onHover('enter', (user) =>
 		{
-			this.isPlayerControlsHovered = true;
+			admin.isControlsHovered = true;
 		});
 
-		behavior.onHover('exit', () =>
+		behavior.onHover('exit', (user) =>
 		{
-			this.isPlayerControlsHovered = false;
+			admin.isControlsHovered = false
 		});
 
 		behavior.onButton('released', (user) =>
 		{
-			if (this.videoInstance)
-				this.playerControlButtonAction(actor.name, user);
+			if (admin.videoInstance)
+				this.adminControlsButtonAction(buttonActor, user);
+		});
+	}
+
+	private createText(parentId: MRE.Guid)
+	{
+		MRE.Actor.Create(this.context,
+		{
+			actor:
+			{
+				name: 'ClickText',
+				parentId: parentId,
+				text:
+				{
+					contents: "Click to enter URL",
+					height: 0.1,
+					anchor: MRE.TextAnchorLocation.MiddleCenter,
+					color: MRE.Color3.White()
+				},
+				transform:
+				{
+					local:
+					{
+						position: { x: 0, y: 0, z: -0.01 }
+					}
+				}
+			}
+		});
+
+		MRE.Actor.Create(this.context,
+		{
+			actor:
+			{
+				name: 'ErrorText',
+				parentId: parentId,
+				appearance: { enabled: false },
+				text:
+				{
+					contents: "Youtube \n video cannot be \n played",
+					height: 0.1,
+					anchor: MRE.TextAnchorLocation.MiddleCenter,
+					color: MRE.Color3.Red(),
+					justify: MRE.TextJustify.Center
+				},
+				transform:
+				{
+					local:
+					{
+						position: { x: 0, y: 0, z: -0.01 }
+					}
+				}
+			}
 		});
 	}
 
@@ -274,18 +304,18 @@ export default class App
 		videoUrl = parsedUrl.href;
 
 		if (parsedUrl.hostname.includes('youtube'))
-		{ 
+		{
 			videoUrl = await this.handleYoutube(parsedUrl);
 		}
 		else if (parsedUrl.hostname.includes('mixer'))
 		{
 			videoUrl = await this.handleMixer(parsedUrl);
 		}
-	
+
 		//Twitch is not implemented client side yet
 		//else if (parsedUrl.hostname.includes('twitch'))
 			//theUri = `twitch://${parsedUrl.href}`;
-		
+
 		else
 		{
 			videoUrl = parsedUrl.href;
@@ -306,7 +336,7 @@ export default class App
 		if (videoInfo.playabilityStatus.status !== "UNPLAYABLE")
 		{
 			if (!videoInfo.streamingData.adaptiveFormats[0].cipher &&
-				!videoInfo.streamingData.adaptiveFormats[0].signatureCipher || 
+				!videoInfo.streamingData.adaptiveFormats[0].signatureCipher ||
 				videoInfo.videoDetails.isLiveContent)
 			{
 				return `youtube://${videoId}`;
@@ -341,14 +371,7 @@ export default class App
 
 	private createOrUpdateVideoPlayer(theUrl: string)
 	{
-		if (!theUrl)
-		{
-			this.videoPlayerActor.appearance.enabled = true;
-			this.errorText.appearance.enabledFor.add('admin');
-			return;
-		}
-
-		const options = 
+		const options =
 		{
 			//looping: this.loop,
 			rolloffStartDistance: 1,
@@ -364,48 +387,60 @@ export default class App
 		   this.video = this.videos.createVideoStream('videoStream', { uri: theUrl });
 		}
 
-		this.videoInstance = this.videoPlayerActor.startVideoStream(this.video.id, options);
-		
+		if (this.videoPlayer)
+		{
+			this.videoInstance = this.videoPlayer.startVideoStream(this.video.id, options);
+			this.videoPlayer.appearance.enabledFor.delete('default');
+		}
+
+		for (let admin in this.admins)
+		{
+			this.admins[admin].videoInstance = this.admins[admin].videoPlayer.startVideoStream(this.video.id, options);
+			this.admins[admin].videoPlayer.appearance.enabled = false;
+			this.admins[admin].videoPlayer.findChildrenByName('ErrorText', false)[0].appearance.enabled = false;
+		}
+
 		this.isVideoPlaying = true;
 
 		this.changePlayPauseButtonState();
-
-		this.videoPlayerActor.appearance.enabled = false;
-		this.errorText.appearance.enabledFor.delete('admin');
 	}
-	
-	private playerControlButtonAction(type: string, user?: MRE.User)
+
+	private adminControlsButtonAction(button: MRE.Actor, user: MRE.User)
 	{
-		switch (type)
+		switch (button.name)
 		{
 			case 'PlayButton':
 			{
-				this.isVideoPlaying = true;
-				this.videoInstance.resume();
-
-				this.changePlayPauseButtonState();
-				break;
-			}
-
-			case 'PauseButton':
-			{
-				this.isVideoPlaying = false;
-				this.videoInstance.pause();
-
-				this.changePlayPauseButtonState();
+				if (!this.isVideoPlaying)
+					this.start();
 				break;
 			}
 
 			case 'StopButton':
 			{
-				this.stop()
+				if (this.isVideoPlaying)
+					this.stop()
+				break;
+			}
 
+			case 'PauseButton':
+			{
+				if (this.isVideoPlaying)
+					this.pause();
 				break;
 			}
 
 			case 'RestartButton':
 			{
-				this.videoInstance.setState({ time: 0 });
+				if (this.isVideoPlaying)
+				{
+					this.videoInstance.setState({ time: 0 });
+
+					for (let admin in this.admins)
+					{
+						this.admins[admin].videoInstance.setState({ time: 0 });
+					}
+				}
 
 				break;
 			}
@@ -428,35 +463,90 @@ export default class App
 		}
 	}
 
+	private start()
+	{
+		this.isVideoPlaying = true;
+
+		if (this.videoInstance)
+		{
+			this.videoInstance.resume();
+		}
+
+		for (let admin in this.admins)
+		{
+			this.admins[admin].videoInstance.resume();
+		}
+
+		this.changePlayPauseButtonState();
+	}
+
 	private stop()
 	{
 		this.isVideoPlaying = false;
 
 		if (this.videoInstance)
+		{
 			this.videoInstance.stop();
+			this.videoPlayer.appearance.enabledFor.add('default');
+		}
 
-		this.videoPlayerActor.appearance.enabled = true;
-		this.clickText.appearance.enabledFor.add('admin');
+		for (let admin in this.admins)
+		{
+			if (this.admins[admin].videoInstance)
+				this.admins[admin].videoInstance.stop();
+
+			this.admins[admin].videoPlayer.appearance.enabled = true;
+			this.admins[admin].videoPlayer.findChildrenByName('ClickText', false)[0].appearance.enabled = true;
+		}
 
 		this.setInitialPlayPauseButtonState();
 	}
 
+	private pause()
+	{
+		this.isVideoPlaying = false;
+
+		if (this.videoInstance)
+		{
+			this.videoInstance.pause();
+		}
+
+		for (let admin in this.admins)
+		{
+			this.admins[admin].videoInstance.pause();
+		}
+
+		this.changePlayPauseButtonState();
+	}
+
 	private setInitialPlayPauseButtonState()
 	{
-		this.playerControlButtons["PlayButton"].appearance.enabled = true;
-		this.playerControlButtons["PlayButton"].collider.enabled = true;
+		for (let admin in this.admins)
+		{
+			let playButton = this.admins[admin].controls.findChildrenByName('PlayButton', true)[0];
+			let pauseButton = this.admins[admin].controls.findChildrenByName('PauseButton', false)[0];
 
-		this.playerControlButtons["PauseButton"].appearance.enabled = false;
-		this.playerControlButtons["PauseButton"].collider.enabled = false;
+			playButton.appearance.enabled = true;
+			playButton.collider.enabled = true;
+
+			pauseButton.appearance.enabled = false;
+			pauseButton.collider.enabled = false;
+		}
 	}
 
 	private changePlayPauseButtonState()
 	{
-		this.playerControlButtons["PauseButton"].appearance.enabled = !this.playerControlButtons["PauseButton"].appearance.enabled
-		this.playerControlButtons["PauseButton"].collider.enabled = !this.playerControlButtons["PauseButton"].collider.enabled;
+		for (let admin in this.admins)
+		{
+			let playButton = this.admins[admin].controls.findChildrenByName('PlayButton', false)[0];
+			let pauseButton = this.admins[admin].controls.findChildrenByName('PauseButton', false)[0];
 
-		this.playerControlButtons["PlayButton"].appearance.enabled = !this.playerControlButtons["PlayButton"].appearance.enabled;
-		this.playerControlButtons["PlayButton"].collider.enabled = !this.playerControlButtons["PlayButton"].collider.enabled;
+			playButton.appearance.enabled = !playButton.appearance.enabled
+			playButton.collider.enabled = !playButton.collider.enabled;
+
+			pauseButton.appearance.enabled = !pauseButton.appearance.enabled;
+			pauseButton.collider.enabled = !pauseButton.collider.enabled;
+		}
 	}
 
 /* Looping is broken
@@ -470,18 +560,6 @@ export default class App
 	}
 */
 
-	private playerControlsEnabled(state: boolean)
-	{
-		if (state === true)
-		{
-		   this.playerControls.appearance.enabledFor.add('admin');
-		} 
-		else if (state === false)
-		{
-			this.playerControls.appearance.enabledFor.delete('admin');
-		}
-	}
-
 	private checkUserRole(user: MRE.User, role: string)
 	{
 		if (user.properties['altspacevr-roles'] === role ||
@@ -489,7 +567,7 @@ export default class App
 		{
 			return true;
 		}
-		
+
 		return false;
 	}
 }
