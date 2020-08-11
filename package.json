@@ -33,7 +33,7 @@
     "typescript": "^3.9.3"
   },
   "dependencies": {
-    "@microsoft/mixed-reality-extension-sdk": "^0.18.1",
+    "@microsoft/mixed-reality-extension-sdk": "^0.19.1",
     "@types/node": "^14.0.13",
     "dotenv": "^8.2.0",
     "get-video-duration": "^3.0.1",
