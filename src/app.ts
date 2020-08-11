@@ -58,9 +58,9 @@ export default class VideoPlayer
 		this.context.onUserJoined((user) => this.handleUser(user));
 	}
 
-	/**
-	 * Once the context is "started", initialize the app.
-	 */
+	/*
+		Once the context is "started", initialize the app.
+	*/
 	private async init()
 	{
 		this.iconMat = this.assets.createMaterial('ControlsMaterial',
@@ -73,6 +73,9 @@ export default class VideoPlayer
 		this.videoPlayerMat = this.assets.createMaterial('material', { color: MRE.Color3.Black() });
 	}
 
+	/*
+		Check if user is a world moderator. If they are, give them admin controls.
+	*/
 	private handleUser(user: MRE.User)
 	{
 		if (this.checkUserRole(user, 'moderator'))
@@ -323,6 +326,9 @@ export default class VideoPlayer
 		return videoUrl;
 	}
 
+	/* 
+		Much easier for Quest/Go users
+	*/
 	private async handleTinyUrl(theUrl: URL.UrlWithParsedQuery)
 	{
 		let tinyId = "";
@@ -347,6 +353,12 @@ export default class VideoPlayer
 		return await this.parseUrl(realUrl.url);
 	}
 
+	
+	/* 
+		Fetch the youtube video id info. If it's a live stream, cool! Pass it along to the client.
+		Otherwise, we need to check to make sure the video file url isn't ciphered. 
+		If it is, we can't play it.
+	*/
 	private async handleYoutube(theUrl: URL.UrlWithParsedQuery)
 	{
 		let videoId = "";
@@ -390,6 +402,13 @@ export default class VideoPlayer
 		return `youtube://${videoId}`;
 	}
 
+
+	/* 
+		Check to see if the streamers displayname (channel name) is the same as their username. 
+		If not, we're gonna have to scrape for it, which takes longer.
+
+		TODO: Check to see if the channel is valid.
+	*/
 	private async handleDLive(theUrl: URL.UrlWithParsedQuery)
 	{
 		let channel = "";
@@ -419,6 +438,10 @@ export default class VideoPlayer
 		return `https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`;
 	}
 
+	/* 
+		Create a new video stream. We must first stop the current video instance in order to destroy it client side.
+		Notice that we dont use this.start() since creating a new video instance will automatically play the video.
+	*/
 	private async createOrUpdateVideoPlayer(theUrl: string)
 	{
 		const options =
@@ -471,6 +494,9 @@ export default class VideoPlayer
 		this.changePlayPauseButtonState();
 	}
 
+	/* 
+		Complete an action based on which button was pressed.
+	*/
 	private adminControlsButtonAction(button: MRE.Actor, user: MRE.User)
 	{
 		switch (button.name)
@@ -518,6 +544,9 @@ export default class VideoPlayer
 		}
 	}
 
+	/* 
+		Start the video. Start the timer based on the video duration.
+	*/
 	private start()
 	{
 		this.isVideoPlaying = true;
@@ -539,6 +568,9 @@ export default class VideoPlayer
 		this.changePlayPauseButtonState();
 	}
 
+	/* 
+		Stop the video. Reset the state of the play/pause buttons and show the default text.
+	*/
 	private stop()
 	{
 		this.isVideoPlaying = false;
@@ -564,6 +596,9 @@ export default class VideoPlayer
 		this.setInitialPlayPauseButtonState();
 	}
 
+	/* 
+		Pause the video. Determine the new time remaining.
+	*/
 	private pause()
 	{
 		this.isVideoPlaying = false;
@@ -584,6 +619,9 @@ export default class VideoPlayer
 		this.changePlayPauseButtonState();
 	}
 
+	/* 
+		Seek to the beginning of the video.
+	*/
 	private restart()
 	{
 		if (this.videoInstance)
@@ -601,6 +639,11 @@ export default class VideoPlayer
 		this.createTimer()
 	}
 
+	/* 
+		We don't want to create a timer for livestreams since they never end.
+
+		Restart or stop the video once the time remaining reaches 0
+	*/
 	private createTimer()
 	{
 		if (!this.isLiveStream)
@@ -627,6 +670,9 @@ export default class VideoPlayer
 		}
 	}
 
+	/* 
+		Resets the visibility of the play/pause buttons so that Play is showing and pause is hidden
+	*/
 	private setInitialPlayPauseButtonState()
 	{
 		for (let admin in this.admins)
@@ -642,6 +688,9 @@ export default class VideoPlayer
 		}
 	}
 
+	/* 
+		Toggles the visibilty of the play/pause buttons 
+	*/
 	private changePlayPauseButtonState()
 	{
 		for (let admin in this.admins)
@@ -657,6 +706,9 @@ export default class VideoPlayer
 		}
 	}
 
+	/* 
+		Toggles the visibilty of the loop buttons 
+	*/
 	private changeLoopButtonState()
 	{
 		for (let admin in this.admins)
@@ -695,6 +747,9 @@ export default class VideoPlayer
 		return false;
 	}
 
+	/*
+		We can grab the streamers username by picking it out from data returned from an API call
+	*/
 	private async scrapeDLive(channel: string)
 	{
 		let username = "";
