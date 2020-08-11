@@ -1,5 +1,7 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
 import Server from './server';
+import getVideoDuration from 'get-video-duration';
+import puppeteer from 'puppeteer';
 
 import URL from 'url';
 import fetch from 'node-fetch';
@@ -20,7 +22,7 @@ interface Admins
 /**
  * The main class of this app. All the logic goes here.
  */
-export default class App
+export default class VideoPlayer
 {
 	private assets: MRE.AssetContainer;
 	private videos: MRE.AssetContainer;
@@ -31,12 +33,21 @@ export default class App
 
 	private video: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
+	private videoDuration: number;
+	private videoTimer: NodeJS.Timer;
+	private startTime: number;
+	private timeRemaining: number;
+
+	private isLiveStream: boolean = false;
 
 	private isVideoPlaying: boolean;
 	private loop: boolean = false;
 
 	private videoPlayerMat: MRE.Material;
 	private iconMat: MRE.Material;
+
+	private texts: { [key: string]: MRE.Actor } = {};
+	private activeText: string;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet)
 	{
@@ -54,7 +65,7 @@ export default class App
 	{
 		this.iconMat = this.assets.createMaterial('ControlsMaterial',
 		{
-			mainTextureId: this.assets.createTexture('icons', { uri: `${Server.baseUrl}/icons.png` }).id,
+			mainTextureId: this.assets.createTexture('icons', { uri: `${Server.baseUrl}/icons-white.png` }).id,
 			emissiveColor: MRE.Color3.White(),
 			alphaMode: MRE.AlphaMode.Blend
 		});
@@ -67,7 +78,7 @@ export default class App
 		if (this.checkUserRole(user, 'moderator'))
 		{
 			user.groups.set(['admin']);
-
+			
 			this.admins[user.id.toString()] =
 			{
 				isControlsHovered: false,
@@ -107,6 +118,8 @@ export default class App
 
 	private async createAdminVideoPlayer(user: MRE.User)
 	{
+		let admin = this.admins[user.id.toString()];
+
 		const adminVideoPlayerActor = MRE.Actor.Create(this.context,
 		{
 			actor:
@@ -118,14 +131,18 @@ export default class App
 					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
 					materialId: this.videoPlayerMat.id
 				},
-				collider:
-				{
-					geometry: { shape: MRE.ColliderType.Auto}
-				}
+				collider: { geometry: { shape: MRE.ColliderType.Auto} }
 			}
 		});
 
-		this.createText(adminVideoPlayerActor.id);
+		this.createText("ClickText", adminVideoPlayerActor.id, "Click to enter URL", MRE.Color3.White());
+		this.createText("YoutubeCiphered", adminVideoPlayerActor.id, "This video cannot \n be played due \n to copyright", MRE.Color3.Red());
+		this.createText("YoutubeUnplayable", adminVideoPlayerActor.id, "This video is \n not viewable \n outside of \n Youtube.com", MRE.Color3.Red());
+		this.createText("InvalidUrl", adminVideoPlayerActor.id, "Invalid URL", MRE.Color3.Red());
+		this.createText("Load", adminVideoPlayerActor.id, "Attempting to load", MRE.Color3.White());
+
+		this.texts["ClickText"].appearance.enabledFor.add('admin');
+		this.activeText = "ClickText";
 
 		const adminControlsActor = MRE.Actor.Create(this.context,
 		{
@@ -138,9 +155,19 @@ export default class App
 			}
 		});
 
-		const admin = this.admins[user.id.toString()];
 		admin.videoPlayer = adminVideoPlayerActor;
 		admin.controls = adminControlsActor;
+
+		await this.assets.loadGltf(`${Server.baseUrl}/videoPlayerControls.glb`);
+
+		this.createButtonActor(admin, "PlayButton", -8);
+		this.createButtonActor(admin, "PauseButton", -8, false);
+		this.createButtonActor(admin, "StopButton",  -6);
+		this.createButtonActor(admin, "RestartButton", -4);
+
+		//Looping is currently broken
+		this.createButtonActor(admin, "LoopButton", 8, false);
+		this.createButtonActor(admin, "LoopGreenButton", 8);
 
 		const behavior = admin.videoPlayer.setBehavior(MRE.ButtonBehavior);
 
@@ -170,34 +197,17 @@ export default class App
 				{
 					if (dialog.submitted)
 					{
-						this.parseUrl(dialog.text).then((parsedUrl) =>
+						this.parseUrl(dialog.text).then((url) =>
 						{
-							admin.videoPlayer.findChildrenByName('ClickText', false)[0].appearance.enabled = false;
-
-							if (!parsedUrl)
+							if (url)
 							{
-								admin.videoPlayer.findChildrenByName('ErrorText', false)[0].appearance.enabled = true;
-							}
-							else
-							{
-								this.createOrUpdateVideoPlayer(parsedUrl);
+								this.createOrUpdateVideoPlayer(url);
 							}
 						});
 					}
 				});
 			}
 		});
-
-		await this.assets.loadGltf(`${Server.baseUrl}/videoPlayerControls.glb`);
-
-		this.createButtonActor(admin, "PlayButton", -8);
-		this.createButtonActor(admin, "PauseButton", -8, false);
-		this.createButtonActor(admin, "StopButton",  -6);
-		this.createButtonActor(admin, "RestartButton", -4);
-
-		//Looping is currently broken
-		//this.createButtonActor("LoopButton", 8, sharedMat, false);
-		//this.createButtonActor("LoopOffButton", 8, sharedMat);
 	}
 
 	private createButtonActor(admin: Admins, theName: string, xOffset: number, isEnabled: boolean = true)
@@ -214,7 +224,11 @@ export default class App
 					materialId: this.iconMat.id,
 					enabled: isEnabled
 				},
-				collider: { geometry: { shape: MRE.ColliderType.Box } },
+				collider: 
+				{ 
+					geometry: { shape: MRE.ColliderType.Box },
+					enabled: isEnabled
+				},
 				transform:
 				{
 					local:
@@ -245,45 +259,24 @@ export default class App
 		});
 	}
 
-	private createText(parentId: MRE.Guid)
+	private createText(name: string, parentId: MRE.Guid, content: string, color: MRE.Color3)
 	{
-		MRE.Actor.Create(this.context,
+		this.texts[name] = MRE.Actor.Create(this.context,
 		{
 			actor:
 			{
-				name: 'ClickText',
+				name: name,
 				parentId: parentId,
-				text:
+				appearance:
 				{
-					contents: "Click to enter URL",
-					height: 0.1,
-					anchor: MRE.TextAnchorLocation.MiddleCenter,
-					color: MRE.Color3.White()
+					enabled: false
 				},
-				transform:
-				{
-					local:
-					{
-						position: { x: 0, y: 0, z: -0.01 }
-					}
-				}
-			}
-		});
-
-		MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
-				name: 'ErrorText',
-				parentId: parentId,
-				appearance: { enabled: false },
 				text:
 				{
-					contents: "Youtube \n video cannot be \n played",
+					contents: content,
 					height: 0.1,
 					anchor: MRE.TextAnchorLocation.MiddleCenter,
-					color: MRE.Color3.Red(),
-					justify: MRE.TextJustify.Center
+					color: color
 				},
 				transform:
 				{
@@ -296,80 +289,137 @@ export default class App
 		});
 	}
 
-	private async parseUrl(url: string)
-	{
-		let parsedUrl = URL.parse(url, true);
-		let videoUrl = "";
+	private async parseUrl(input: string)
+	{		
+		let parsedInputAsURL = URL.parse(input, true);
+		let videoUrl = parsedInputAsURL.href;
 
-		videoUrl = parsedUrl.href;
+		this.showText('Load');
 
-		if (parsedUrl.hostname.includes('youtube'))
+		if (parsedInputAsURL.protocol === null)
 		{
-			videoUrl = await this.handleYoutube(parsedUrl);
-		}
-		else if (parsedUrl.hostname.includes('mixer'))
-		{
-			videoUrl = await this.handleMixer(parsedUrl);
+			this.showText("InvalidUrl");
+			return;
 		}
 
-		//Twitch is not implemented client side yet
-		//else if (parsedUrl.hostname.includes('twitch'))
-			//theUri = `twitch://${parsedUrl.href}`;
-
-		else
+		if (input.includes('tinyurl'))
 		{
-			videoUrl = parsedUrl.href;
+			videoUrl = await this.handleTinyUrl(parsedInputAsURL);
+		}
+		else if (input.includes('youtube'))
+		{
+			videoUrl = await this.handleYoutube(parsedInputAsURL);
+		}
+		else if (input.includes('dlive'))
+		{
+			videoUrl = await this.handleDLive(parsedInputAsURL);
+		}
+
+		if (input.includes('m3u8'))
+		{
+			this.isLiveStream = true;
 		}
 
 		return videoUrl;
 	}
 
+	private async handleTinyUrl(theUrl: URL.UrlWithParsedQuery)
+	{
+		let tinyId = "";
+
+		if (theUrl.protocol.includes("tinyurl"))
+		{
+			tinyId = theUrl.hostname;
+		}
+		else if (theUrl.protocol.includes("http") && theUrl.path)
+		{
+			tinyId = theUrl.pathname.substr(1);
+		}
+		else
+		{
+			this.showText("InvalidUrl");
+			return;
+		}
+
+		let realUrl = await fetch(`https://tinyurl.com/${tinyId}`);
+
+		//run through parseUrl with new URL
+		return await this.parseUrl(realUrl.url);
+	}
+
 	private async handleYoutube(theUrl: URL.UrlWithParsedQuery)
 	{
-		let videoId = theUrl.query.v as string;
+		let videoId = "";
+
+		if (theUrl.protocol.includes("youtube"))
+		{
+			videoId = theUrl.hostname;
+		}
+		else if (theUrl.protocol.includes("http") && theUrl.query.v)
+		{
+			videoId = theUrl.query.v as string;
+		}
+		else
+		{
+			this.showText("InvalidUrl");
+			return;
+		}
 
 		const response = await fetch(`https://www.youtube.com/get_video_info?video_id=${videoId}`);
 		const info = await response.text();
 
 		let videoInfo = JSON.parse(unescape(info).match(/(?<=player_response=)[^&]+/)[0]);
 
-		if (videoInfo.playabilityStatus.status !== "UNPLAYABLE")
+		if (videoInfo.streamingData.adaptiveFormats[0].cipher || videoInfo.streamingData.adaptiveFormats[0].signatureCipher)
 		{
-			if (!videoInfo.streamingData.adaptiveFormats[0].cipher &&
-				!videoInfo.streamingData.adaptiveFormats[0].signatureCipher ||
-				videoInfo.videoDetails.isLiveContent)
-			{
-				return `youtube://${videoId}`;
-			}
+			this.showText("YoutubeCiphered");
+			return;
+		} 
+		
+		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
+		{
+			this.showText("YoutubeUnplayable");
+			return;
+		}			
+		
+		if (videoInfo.videoDetails.isLiveContent)
+		{
+			this.isLiveStream = true;
 		}
 
-		return;
+		return `youtube://${videoId}`;
 	}
 
-	private async handleMixer(theUrl: URL.UrlWithParsedQuery)
+	private async handleDLive(theUrl: URL.UrlWithParsedQuery)
 	{
-		let vod = theUrl.query.vod as string;
-
-		const response = await fetch(`https://mixer.com/api/v1/recordings/${vod}`);
-		const info: any = await response.json();
-
-		if (info.vods)
+		let channel = "";
+		
+		if (theUrl.protocol.includes("dlive"))
 		{
-			for (let dataType of info.vods)
-			{
-				if (dataType.format === "raw")
-				{
-					let vodBaseUrl = dataType.baseUrl;
-
-					return `${vodBaseUrl}/source.mp4`;
-				}
-			}
+			channel = theUrl.hostname;
+		}
+		else if (theUrl.protocol.includes("http") && theUrl.pathname !== "")
+		{
+			channel = theUrl.pathname.substr(1);
+		}
+		else
+		{
+			this.showText("InvalidUrl");
+			return;
 		}
 
-		return `mixer://${theUrl.href}`;
+		let response = await fetch(`https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`);
+		if (response.status !== 200)
+		{
+			channel = await this.scrapeDLive(channel.toLowerCase());
+		}
+
+		this.isLiveStream = true;
+
+		return `https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`;
 	}
 
-	private createOrUpdateVideoPlayer(theUrl: string)
+	private async createOrUpdateVideoPlayer(theUrl: string)
 	{
 		const options =
 		{
@@ -384,9 +434,16 @@ export default class App
 
 		if (!this.video || this.video.uri !== theUrl)
 		{
-		   this.video = this.videos.createVideoStream('videoStream', { uri: theUrl });
-		}
+			this.video = this.videos.createVideoStream('videoStream', { uri: theUrl });
 
+			await this.video.created;
+
+			this.videoDuration = this.video.duration * 1000;
+
+			if (theUrl.includes('webm') || theUrl.includes('mp4'))
+				this.videoDuration = await getVideoDuration(theUrl) * 1000;
+		}
+		
 		if (this.videoPlayer)
 		{
 			this.videoInstance = this.videoPlayer.startVideoStream(this.video.id, options);
@@ -397,10 +454,19 @@ export default class App
 		{
 			this.admins[admin].videoInstance = this.admins[admin].videoPlayer.startVideoStream(this.video.id, options);
 			this.admins[admin].videoPlayer.appearance.enabled = false;
-			this.admins[admin].videoPlayer.findChildrenByName('ErrorText', false)[0].appearance.enabled = false;
 		}
-
+		
 		this.isVideoPlaying = true;
+
+		if (!this.isLiveStream)
+		{
+			this.startTime = Date.now();
+			this.timeRemaining = this.videoDuration;
+			this.createTimer();
+		}		
+		
+		this.texts[this.activeText].appearance.enabledFor.delete('admin');
+		this.activeText = "";
 
 		this.changePlayPauseButtonState();
 	}
@@ -432,32 +498,21 @@ export default class App
 
 			case 'RestartButton':
 			{
-				if (this.isVideoPlaying)
-				{
-					this.videoInstance.setState({ time: 0 });
-
-					for (let admin in this.admins)
-					{
-						this.admins[admin].videoInstance.setState({ time: 0 });
-					}
-				}
+				this.restart();
 
 				break;
 			}
 
-		/*  Looping is currently broken
 			case 'LoopButton':
-			case 'LoopOffButton':
+			case 'LoopGreenButton':
 			{
 				this.loop = !this.loop;
-				this.videoInstance.setState({looping: this.loop});
 
 				this.changeLoopButtonState();
 
 				break;
 			}
-		*/
-
+	
 			default:
 				break;
 		}
@@ -466,6 +521,10 @@ export default class App
 	private start()
 	{
 		this.isVideoPlaying = true;
+
+		this.startTime = Date.now();
+
+		this.createTimer();
 
 		if (this.videoInstance)
 		{
@@ -484,6 +543,8 @@ export default class App
 	{
 		this.isVideoPlaying = false;
 
+		clearTimeout(this.videoTimer)
+
 		if (this.videoInstance)
 		{
 			this.videoInstance.stop();
@@ -496,8 +557,9 @@ export default class App
 				this.admins[admin].videoInstance.stop();
 
 			this.admins[admin].videoPlayer.appearance.enabled = true;
-			this.admins[admin].videoPlayer.findChildrenByName('ClickText', false)[0].appearance.enabled = true;
 		}
+
+		this.showText("ClickText");
 
 		this.setInitialPlayPauseButtonState();
 	}
@@ -505,6 +567,9 @@ export default class App
 	private pause()
 	{
 		this.isVideoPlaying = false;
+
+		clearTimeout(this.videoTimer)
+		this.timeRemaining -= Date.now() - this.startTime;
 
 		if (this.videoInstance)
 		{
@@ -517,6 +582,49 @@ export default class App
 		}
 
 		this.changePlayPauseButtonState();
+	}
+
+	private restart()
+	{
+		if (this.videoInstance)
+		{
+			this.videoInstance.setState({ time: 0 });
+		}
+
+		for (let admin in this.admins)
+		{
+			this.admins[admin].videoInstance.setState({ time: 0 });
+		}
+
+		this.timeRemaining = this.videoDuration;
+
+		this.createTimer()
+	}
+
+	private createTimer()
+	{
+		if (!this.isLiveStream)
+		{
+			clearTimeout(this.videoTimer)
+
+			this.startTime = Date.now();
+
+			this.videoTimer = setTimeout(() =>
+			{
+				if (this.isVideoPlaying)
+				{
+					if (this.loop)
+					{
+						this.restart();
+					}
+					else
+					{
+						this.stop();
+					}
+				}
+
+			}, Math.floor(this.timeRemaining));
+		}
 	}
 
 	private setInitialPlayPauseButtonState()
@@ -549,16 +657,32 @@ export default class App
 		}
 	}
 
-/* Looping is broken
 	private changeLoopButtonState()
 	{
-		this.playerControlButtons["LoopButton"].appearance.enabled = !this.playerControlButtons["LoopButton"].appearance.enabled
-		this.playerControlButtons["LoopButton"].collider.enabled = !this.playerControlButtons["LoopButton"].collider.enabled;
+		for (let admin in this.admins)
+		{
+			let loopButton = this.admins[admin].controls.findChildrenByName('LoopButton', false)[0];
+			let loopGreenButton = this.admins[admin].controls.findChildrenByName('LoopGreenButton', false)[0];
 
-		this.playerControlButtons["LoopGreenButton"].appearance.enabled = !this.playerControlButtons["LoopGreenButton"].appearance.enabled
-		this.playerControlButtons["LoopGreenButton"].collider.enabled = !this.playerControlButtons["LoopGreenButton"].collider.enabled;
+			loopButton.appearance.enabled = !loopButton.appearance.enabled
+			loopButton.collider.enabled = !loopButton.collider.enabled;
+
+			loopGreenButton.appearance.enabled = !loopGreenButton.appearance.enabled;
+			loopGreenButton.collider.enabled = !loopGreenButton.collider.enabled;
+		}
 	}
-*/
+
+	private showText(type: string)
+	{
+		if (this.activeText !== type)
+		{
+			if (this.activeText)
+				this.texts[this.activeText].appearance.enabledFor.delete('admin');
+			
+			this.texts[type].appearance.enabledFor.add('admin');
+			this.activeText = type;
+		}
+	}
 
 	private checkUserRole(user: MRE.User, role: string)
 	{
@@ -569,5 +693,43 @@ export default class App
 		}
 
 		return false;
+	}
+
+	private async scrapeDLive(channel: string)
+	{
+		let username = "";
+
+		const browser = await puppeteer.launch({
+			headless: true,
+			args: ['--no-sandbox', '--incognito']
+		});
+		
+		const page = await browser.newPage();
+
+		page.setJavaScriptEnabled(true);
+
+		const response = new Promise(resolve =>
+		{
+			page.on('response', (e) =>
+			{
+				if (e.url() === "https://graphigo.prd.dlive.tv/" && e.headers()['content-type'] === "application/json")
+				{
+					e.json().then((json: any) =>
+					{
+						if (json.data.userByDisplayName.displayname.toLowerCase() === channel)
+						{
+							username = json.data.userByDisplayName.username;
+							resolve();
+						}
+					});
+				}
+			})
+		});
+
+		await page.goto(`https://dlive.tv/${channel}`, { waitUntil: 'networkidle0' });
+		await response;
+		await browser.close();
+		
+		return username;
 	}
 }

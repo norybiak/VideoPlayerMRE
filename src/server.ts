@@ -1,6 +1,6 @@
 import { log, WebHost } from '@microsoft/mixed-reality-extension-sdk';
 import { resolve as resolvePath } from 'path';
-import App from './app';
+import VideoPlayer from './app';
 
 log.enable('app');
 //log.enable('network');
@@ -15,6 +15,6 @@ const server = new WebHost({
 });
 
 // Handle new application sessions
-server.adapter.onConnection((context, params) => new App(context, params));
+server.adapter.onConnection((context, params) => new VideoPlayer(context, params));
 
 export default server;
