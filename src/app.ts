@@ -382,17 +382,17 @@ export default class VideoPlayer
 
 		let videoInfo = JSON.parse(unescape(info).match(/(?<=player_response=)[^&]+/)[0]);
 
+		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
+		{
+			this.showText("YoutubeUnplayable");
+			return;
+		}		
+
 		if (videoInfo.streamingData.adaptiveFormats[0].cipher || videoInfo.streamingData.adaptiveFormats[0].signatureCipher)
 		{
 			this.showText("YoutubeCiphered");
 			return;
 		} 
-		
-		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
-		{
-			this.showText("YoutubeUnplayable");
-			return;
-		}			
 		
 		if (videoInfo.videoDetails.isLiveContent)
 		{
