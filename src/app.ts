@@ -1,8 +1,6 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
 import Server from './server';
 import getVideoDuration from 'get-video-duration';
-import puppeteer from 'puppeteer';
-
 import URL from 'url';
 import fetch from 'node-fetch';
 
@@ -71,6 +69,7 @@ export default class VideoPlayer
 		});
 
 		this.videoPlayerMat = this.assets.createMaterial('material', { color: MRE.Color3.Black() });
+		
 	}
 
 	/*
@@ -318,6 +317,13 @@ export default class VideoPlayer
 			videoUrl = await this.handleDLive(parsedInputAsURL);
 		}
 
+		/*
+		else if (input.includes('twitch'))
+		{
+			videoUrl = await this.handleTwitch(parsedInputAsURL);
+		}
+		*/
+
 		if (input.includes('m3u8'))
 		{
 			this.isLiveStream = true;
@@ -427,15 +433,11 @@ export default class VideoPlayer
 			return;
 		}
 
-		let response = await fetch(`https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`);
-		if (response.status !== 200)
-		{
-			channel = await this.scrapeDLive(channel.toLowerCase());
-		}
+		let username = await this.scrapeDLive(channel.toLowerCase());
 
 		this.isLiveStream = true;
 
-		return `https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`;
+		return `https://live.prd.dlive.tv/hls/live/${username.toLowerCase()}.m3u8`;
 	}
 
 	/* 
@@ -448,7 +450,7 @@ export default class VideoPlayer
 		{
 			//looping: this.loop,
 			rolloffStartDistance: 1,
-			spread: 0.6,
+			spread: 0,
 			volume: 0.5,
 			visible: true
 		};
@@ -477,6 +479,8 @@ export default class VideoPlayer
 		{
 			this.admins[admin].videoInstance = this.admins[admin].videoPlayer.startVideoStream(this.video.id, options);
 			this.admins[admin].videoPlayer.appearance.enabled = false;
+
+			this.admins[admin].videoInstance.setState({spread: 0 });
 		}
 		
 		this.isVideoPlaying = true;
@@ -752,39 +756,11 @@ export default class VideoPlayer
 	*/
 	private async scrapeDLive(channel: string)
 	{
-		let username = "";
+		let text = await (await fetch(`https://dlive.tv/${channel}`)).text();
 
-		const browser = await puppeteer.launch({
-			headless: true,
-			args: ['--no-sandbox', '--incognito']
-		});
-		
-		const page = await browser.newPage();
+		//Regex from https://github.com/streamlink/streamlink
+		let username = text.match(/(?<=user:)(\w|-)+/)[0];
 
-		page.setJavaScriptEnabled(true);
-
-		const response = new Promise(resolve =>
-		{
-			page.on('response', (e) =>
-			{
-				if (e.url() === "https://graphigo.prd.dlive.tv/" && e.headers()['content-type'] === "application/json")
-				{
-					e.json().then((json: any) =>
-					{
-						if (json.data.userByDisplayName.displayname.toLowerCase() === channel)
-						{
-							username = json.data.userByDisplayName.username;
-							resolve();
-						}
-					});
-				}
-			})
-		});
-
-		await page.goto(`https://dlive.tv/${channel}`, { waitUntil: 'networkidle0' });
-		await response;
-		await browser.close();
-		
 		return username;
 	}
 }
