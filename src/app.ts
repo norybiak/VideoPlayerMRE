@@ -711,7 +711,6 @@ export default class VideoPlayer
 
 	private async shortenUrl (url: string) {
 		let text = await (await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url))).text();
-		console.log('shortened the url myself');
 		return text;
 	}
 
