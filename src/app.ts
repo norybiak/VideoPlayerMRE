@@ -373,6 +373,22 @@ export default class VideoPlayer
 
 		let videoInfo = JSON.parse(unescape(info).match(/(?<=player_response=)[^&]+/)[0]);
 
+		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
+		{
+			this.showText("YoutubeUnplayable");
+			return;
+		}	
+
+		if (videoInfo.videoDetails.isLiveContent)
+		{
+			this.isLiveStream = true;
+
+			if (videoInfo.streamingData.hlsManifestUrl)
+			{
+				return videoInfo.streamingData.hlsManifestUrl;
+			}
+		}
+
 		if (videoInfo.streamingData.adaptiveFormats[0].cipher || 
 			videoInfo.streamingData.adaptiveFormats[0].signatureCipher ||
 			videoInfo.streamingData.formats[0].cipher ||
@@ -382,17 +398,6 @@ export default class VideoPlayer
 			return;
 		} 
 		
-		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
-		{
-			this.showText("YoutubeUnplayable");
-			return;
-		}			
-		
-		if (videoInfo.videoDetails.isLiveContent)
-		{
-			this.isLiveStream = true;
-		}
-
 		return `youtube://${videoId}`;
 	}
 
