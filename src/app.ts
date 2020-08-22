@@ -320,7 +320,6 @@ export default class VideoPlayer
 
 		if (input.includes('m3u8'))
 		{
-			console.log(videoUrl);
 			this.isLiveStream = true;
 		}
 
