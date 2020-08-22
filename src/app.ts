@@ -3,6 +3,8 @@ import Server from './server';
 import getVideoDuration from 'get-video-duration';
 import URL from 'url';
 import fetch from 'node-fetch';
+// @ts-ignore
+import twitchStreams from 'twitch-get-stream';
 
 const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
@@ -311,9 +313,14 @@ export default class VideoPlayer
 		{
 			videoUrl = await this.handleDLive(parsedInputAsURL);
 		}
+		else if (input.includes('twitch'))
+		{
+			videoUrl = await this.handleTwitch(parsedInputAsURL);
+		}
 
 		if (input.includes('m3u8'))
 		{
+			console.log(videoUrl);
 			this.isLiveStream = true;
 		}
 
@@ -413,6 +420,47 @@ export default class VideoPlayer
 		this.isLiveStream = true;
 
 		return `https://live.prd.dlive.tv/hls/live/${username.toLowerCase()}.m3u8`;
+	}
+
+	private async handleTwitch(theUrl: URL.UrlWithParsedQuery)
+	{
+		let channel = "";
+		let m3u8Url = "";
+		let shortenedm3u8Url = "";
+
+		if (theUrl.protocol.includes("twitch"))
+		{
+			channel = theUrl.hostname;
+			console.log("Twitch channel:" + channel)
+		}
+		//else if (theUrl.protocol.includes("http") && theUrl.pathname !== "")
+		//{
+		//	channel = theUrl.pathname.substr(1);
+		//}
+		else
+		{
+			this.showText("InvalidUrl");
+			return;
+		}
+
+		this.isLiveStream = true;
+
+		await twitchStreams.get(channel)
+			.then(function(streams: { resolution: string; quality: string; url: string; }[]) {
+				m3u8Url = streams[0].url;
+				// we could find a resolution that works best instead
+				//for (var stream of streams)
+				//    console.log(stream.quality + ' (' + stream.resolution + '): ' + stream.url);
+			})
+			.catch(function(error: any) {
+				if (error)
+					return console.log('Error caught:', error);
+			});
+	    // we need to shorten the url because there is a bug in Altspace's MRE and the URL can't be very long
+		shortenedm3u8Url = await this.shortenUrl(m3u8Url);
+
+		shortenedm3u8Url + ".m3u8";
+		return shortenedm3u8Url;
 	}
 
 	private async createOrUpdateVideoPlayer(theUrl: string)
@@ -660,6 +708,12 @@ export default class VideoPlayer
 		}
 
 		return false;
+	}
+
+	private async shortenUrl (url: string) {
+		let text = await (await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url))).text();
+		console.log('shortened the url myself');
+		return text;
 	}
 
 	private async scrapeDLive(channel: string)
