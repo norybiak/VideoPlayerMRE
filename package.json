@@ -37,6 +37,7 @@
     "dotenv": "^8.2.0",
     "get-video-duration": "^3.0.1",
     "node-fetch": "^v3.0.0-beta.6",
+    "twitch-get-stream": "^0.6.0",
     "url": "^0.11.0"
   }
 }
