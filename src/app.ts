@@ -532,7 +532,14 @@ export default class VideoPlayer {
 		} else {
 			this.showLabel("InvalidUrl");
 			return;
-		}
+		} 
+
+		await fetch(theUrl.href).then((res) => {
+			if (!res.ok) {
+				this.showLabel("InvalidUrl");
+				return;
+			}
+		});
 
 		let username = await this.scrapeDLive(channel.toLowerCase());
 		this.isLiveStream = true;
@@ -548,33 +555,27 @@ export default class VideoPlayer {
 
 		if (theUrl.protocol.includes("twitch")) {
 			channel = theUrl.hostname;
-			console.log("Twitch channel:" + channel)
-		}
-		//else if (theUrl.protocol.includes("http") && theUrl.pathname !== "")
-		//{
-		//	channel = theUrl.pathname.substr(1);
-		//}
-		else {
+		} else if (theUrl.protocol.includes("http") && theUrl.pathname !== "") {
+			channel = theUrl.pathname.substr(1);
+		} else {
 			this.showLabel("InvalidUrl");
 			return;
 		}
 
-		this.isLiveStream = true;
-
-		await twitchStreams.get(channel)
-			.then(function(streams: { resolution: string; quality: string; url: string; }[]) {
-				m3u8Url = streams[0].url;
+		await twitchStreams.get(channel).then((streams: { resolution: string, quality: string, url: string }[]) => {	
+			m3u8Url = streams[0].url;
 				// we could find a resolution that works best instead
-				//for (var stream of streams)
+				// for (var stream of streams)
 				//    console.log(stream.quality + ' (' + stream.resolution + '): ' + stream.url);
-			})
-			.catch(function(error: any) {
-				if (error)
-					return console.log('Error caught:', error);
-			});
+		}).catch((error: string) => {
+			if (error)
+				return console.log('Error caught:', error);
+		});
+
 	    // we need to shorten the url because there is a bug in Altspace's MRE and the URL can't be very long
 		shortenedm3u8Url = await this.shortenUrl(m3u8Url);
 		shortenedm3u8Url + ".m3u8";
+		this.isLiveStream = true;
 		return shortenedm3u8Url;
 
 	}
@@ -786,6 +787,7 @@ export default class VideoPlayer {
 	private async shortenUrl (url: string) {
 
 		let text = await (await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url))).text();
+
 		return text;
 
 	}
