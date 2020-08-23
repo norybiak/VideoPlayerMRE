@@ -6,148 +6,144 @@ import fetch from 'node-fetch';
 // @ts-ignore
 import twitchStreams from 'twitch-get-stream';
 
+import * as MediaController from './media-controls';
+
 const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
-const BUTTON_SCALE = 0.03;
+const BUTTON_SCALE = 0.02;
 
-interface Admins
-{
+interface Admins {
+
 	controls?: MRE.Actor,
 	isVideoPlayerHovered: boolean,
-	isControlsHovered: boolean
+	isControlsHovered: boolean,
+	isVolumeHovered: boolean,
+	isVolumeSliderHovered: boolean
+
 }
 
 /**
  * The main class of this app. All the logic goes here.
  */
-export default class VideoPlayer
-{
+export default class VideoPlayer {
+
 	private assets: MRE.AssetContainer;
 	private videos: MRE.AssetContainer;
 
 	private admins: { [key: string]: Admins } = {};
 
-	private videoPlayerActor: MRE.Actor;
-
+	// VIDEO PLAYER
+	private videoPlayerContainer: MediaController.Container;
 	private videoStream: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
 	private videoDuration: number;
-
-	private videoTimer: NodeJS.Timer;
-	private startTime: number;
-	private timeRemaining: number;
-
 	private isVideoPlaying: boolean;
+
+	// VIDEO CONFIG
 	private loop: boolean = false;
+	private volume: number = 0.5;
 	private isLiveStream: boolean = false;
+	private muted: boolean = false;
 
-	private videoPlayerActorMat: MRE.Material;
-	private iconsMat: MRE.Material;
+	// MODERATOR MEDIA CONTROLS
+	private adminControlsContainer: MediaController.Container;
+	private seekSliderPuck: MRE.Actor;
+	private volumeSliderPuck: MRE.Actor;
+	private timeLabel: MediaController.Label;
+	private mediaDurationLabel: string;
+	private holdingSliderPuck: boolean = false;
 
-	private adminTextLayer: MRE.Actor;
-	private adminTextActors: { [key: string]: MRE.Actor } = {};
-	private adminActiveText: string;
+	// MODERATOR VIDEO PLAYER TEXT
+	private adminInfoContainer: MediaController.Container;
+	private adminInfoActive: MediaController.Label;
 
-	constructor(private context: MRE.Context, private params: MRE.ParameterSet)
-	{
+	//LOOP
+	private tick = 10;
+	private tickInterval = 1000 / this.tick;
+	private expected = Date.now();
+
+	// TIMES
+	private currentTime: number;
+
+	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
+
 		this.videos = new MRE.AssetContainer(context);
 		this.assets = new MRE.AssetContainer(context);
 
 		this.context.onStarted(() => this.init());
 		this.context.onUserJoined((user) => this.handleUser(user));
+
 	}
 
 	/**
 	 * Once the context is "started", initialize the app.
 	 */
-	private async init()
-	{
-		this.iconsMat = this.assets.createMaterial('ControlsMaterial',
-		{
-			mainTextureId: this.assets.createTexture('icons', { uri: `${Server.baseUrl}/icons-white.png` }).id,
-			emissiveColor: MRE.Color3.White(),
-			alphaMode: MRE.AlphaMode.Blend
-		});
+	private async init() {
 
-		this.videoPlayerActorMat = this.assets.createMaterial('material', { color: MRE.Color3.Black() });
-
-		this.createVideoPlayerActors();
+		this.createVideoPlayerContainer();
+		this.createVideoPlayerInfoLabels()
+		this.createAdminControls();
+		this.startLoop();
 	}
 
-	private handleUser(user: MRE.User)
-	{
-		if (this.checkUserRole(user, 'moderator'))
-		{
+	private handleUser(user: MRE.User) {
+
+		if (this.checkUserRole(user, 'moderator')) {
 			user.groups.set(['admin']);
 
-			this.admins[user.id.toString()] =
-			{
+			this.admins[user.id.toString()] = {
 				isControlsHovered: false,
-				isVideoPlayerHovered: false
+				isVideoPlayerHovered: false,
+				isVolumeHovered: false,
+				isVolumeSliderHovered: false
 			};
-
-			this.createAdminController(user);
 		}
+
 	}
 
-	private createVideoPlayerActors()
-	{
-		this.videoPlayerActor = MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
-				name: 'videoPlayerActorActor',
-				appearance:
-				{
+	private createVideoPlayerContainer() {
+
+		this.videoPlayerContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
+			actor: {
+				name: 'videoPlayerContainer',
+				appearance: {
 					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
 					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
 				},
-				collider:
-				{
-					geometry: { shape: MRE.ColliderType.Auto}
+				collider: {
+					geometry: { shape: MRE.ColliderType.Auto }
 				}
 			}
 		});
 
-		const behavior = this.videoPlayerActor.setBehavior(MRE.ButtonBehavior);
-
-		behavior.onHover('enter', (user) =>
-		{
-			if (this.checkUserRole(user, 'moderator'))
-			{
+		this.videoPlayerContainer.addBehavior('enter', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()];
 				admin.isVideoPlayerHovered = true;
-				admin.controls.appearance.enabled = true;
+				user.groups.add('adminShowControls');
 			}
 		});
 
-		behavior.onHover('exit', (user) =>
-		{
-			if (this.checkUserRole(user, 'moderator'))
-			{
+		this.videoPlayerContainer.addBehavior('exit', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()];
 				admin.isVideoPlayerHovered = false;
 
-				setTimeout(() =>
-				{
-					if (!admin.isVideoPlayerHovered && !admin.isControlsHovered)
-						admin.controls.appearance.enabled = false;
-				}, 500);
+				setTimeout(() => {
+					if (!admin.isVideoPlayerHovered && !admin.isControlsHovered) {
+						user.groups.delete('adminShowControls');
+					}	
+				}, 1000);
 			}
 		});
 
-		behavior.onClick((user) =>
-		{
-			if (this.checkUserRole(user, 'moderator'))
-			{
-				user.prompt("Enter Video URL", true).then((dialog) =>
-				{
-					if (dialog.submitted)
-					{
-						this.parseUrl(dialog.text).then((url) =>
-						{
-							if (url)
-							{
+		this.videoPlayerContainer.addBehavior('click', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
+				user.prompt("Enter Video URL", true).then((dialog) => {
+					if (dialog.submitted) {
+						this.stop();
+						this.parseUrl(dialog.text).then((url) => {
+							if (url) {
 								this.createOrUpdateVideoPlayer(url);
 							}
 						});
@@ -156,191 +152,320 @@ export default class VideoPlayer
 			}
 		});
 
-		this.adminTextLayer = MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
+	}
+
+	private createVideoPlayerInfoLabels() {
+
+		this.adminInfoContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
+			labelScale: 0.1,
+			actor: {
 				name: 'adminTextLayer',
-				parentId: this.videoPlayerActor.id,
-				transform:
-				{
-					local:
-					{
+				parentId: this.videoPlayerContainer.actor.id,
+				appearance: {
+					enabled: new MRE.GroupMask(this.context, ['admin'])
+				},
+				transform: {
+					local: {
 						position: { x: 0, y: 0, z: -0.01 }
 					}
 				}
 			}
 		});
 
-		this.createTextActor("ClickText", this.adminTextLayer.id, "Click to enter URL", MRE.Color3.White());
-		this.createTextActor("YoutubeCiphered", this.adminTextLayer.id, "This video cannot \n be played due \n to copyright", MRE.Color3.Red());
-		this.createTextActor("YoutubeUnplayable", this.adminTextLayer.id, "This video is \n not viewable \n outside of \n Youtube.com", MRE.Color3.Red());
-		this.createTextActor("InvalidUrl", this.adminTextLayer.id, "Invalid URL", MRE.Color3.Red());
-		this.createTextActor("Load", this.adminTextLayer.id, "Attempting to load", MRE.Color3.White());
+		this.adminInfoActive = this.adminInfoContainer.createLabel("Click to enter URL", {
+			name: "ClickText", appearance: { enabled: true }
+		});
+		this.adminInfoContainer.createLabel("This video cannot \n be played due \n to copyright", { 
+			name: "YoutubeCiphered", appearance: { enabled: false }
+		});	
+		this.adminInfoContainer.createLabel("This video is \n not viewable \n outside of \n Youtube.com", { 
+			name: "YoutubeUnplayable", appearance: { enabled: false }
+		});
+		this.adminInfoContainer.createLabel("Invalid URL", { 
+			name: "InvalidUrl", appearance: { enabled: false }
+		});
+		this.adminInfoContainer.createLabel("Attempting to load", { 
+			name: "Load", appearance: { enabled: false }
+		});
 
-		this.adminTextActors["ClickText"].appearance.enabledFor.add('admin');
-		this.adminActiveText = "ClickText";
 	}
 
-	private async createAdminController(user: MRE.User)
-	{
-		let admin = this.admins[user.id.toString()];
+	private async createAdminControls() {
 
-		const adminControlsActor = MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
-				name: "playerControls",
-				exclusiveToUser: user.id,
-				appearance: { enabled: false },
-				transform: { local: { position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.01 } } }
+		this.adminControlsContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
+			iconScale: BUTTON_SCALE,
+			actor: {
+				appearance: { enabled: new MRE.GroupMask(this.context, ['adminShowControls']) },
+				transform: {
+					local: {
+						position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.01 }
+					}
+				},
 			}
 		});
 
-		admin.controls = adminControlsActor;
+		let text: Partial<MRE.TextLike> = {
+			height: 0.1,
+			anchor: MRE.TextAnchorLocation.MiddleCenter,
+		}
 
-		await this.assets.loadGltf(`${Server.baseUrl}/videoPlayerControls.glb`);
+		this.timeLabel = this.adminControlsContainer.createLabel('', {
+			transform: {
+				local: {
+					position: { x: 1.5/20, y: -0.5/20 }
+				}
+			},
+			text: {
+				height: 0.02
+			}
+		});
 
-		this.createButtonActor(admin, "PlayButton", -8);
-		this.createButtonActor(admin, "PauseButton", -8, false);
-		this.createButtonActor(admin, "StopButton",  -6);
-		this.createButtonActor(admin, "RestartButton", -4);
-		this.createButtonActor(admin, "LoopButton", 8, false);
-		this.createButtonActor(admin, "LoopGreenButton", 8);
-	}
+		await this.adminControlsContainer.loadGltf();
 
-	private createButtonActor(admin: Admins, theName: string, xOffset: number, isEnabled: boolean = true)
-	{
-		const buttonActor = MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
-				name: theName,
-				parentId: admin.controls.id,
-				appearance:
-				{
-					meshId: this.assets.meshes.find(m => m.name === theName).id,
-					materialId: this.iconsMat.id,
-					enabled: isEnabled
-				},
-				collider: 
-				{ 
-					geometry: { shape: MRE.ColliderType.Box },
-					enabled: isEnabled
-				},
-				transform:
-				{
-					local:
-					{
-						position: { x: xOffset/20, y: 0, z: 0},
-						scale: { x: BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE },
-						rotation: MRE.Quaternion.FromEulerAngles(-90 * MRE.DegreesToRadians, 0, 0)
-					}
+		this.adminControlsContainer.createIcon(MediaController.IconType.Play, {
+			name: "playBtn",
+			transform: { local: { position: { x: -9/20 } } }
+		}).addBehavior('released', () => this.play())
+
+		this.adminControlsContainer.createIcon(MediaController.IconType.Pause, {
+			name: "pauseBtn",
+			appearance: { enabled: false },
+			transform: { local: { position: { x: -9/20 } } }
+		}).addBehavior('released', () => this.pause());
+
+		this.adminControlsContainer.createIcon(MediaController.IconType.Stop, {
+			name: "stopBtn",
+			transform: { local: { position: { x: -7.5/20 } } }
+		}).addBehavior('released', () => this.stop());
+
+		this.adminControlsContainer.createIcon(MediaController.IconType.Restart, {
+			name: "restartBt",
+			transform: { local: { position: { x: -6/20 } } }
+		}).addBehavior('released', () => this.restart());
+
+		this.adminControlsContainer.createIcon(MediaController.IconType.LoopOn, {
+			name: "loopOnBtn",
+			appearance: { enabled: false },
+			transform: { local: { position: { x: 9/20 } } }
+		}).addBehavior('released', () => this.toggleLoop());
+
+		this.adminControlsContainer.createIcon(MediaController.IconType.LoopOff, {
+			name: "loopOffBtn",
+			transform: { local: { position: { x: 9/20 } } }
+		}).addBehavior('released', () => this.toggleLoop());
+
+		const seeksSlider = this.adminControlsContainer.createIcon(MediaController.IconType.Slider, {
+			name: "seekSlider",
+			transform: { local: { position: { x: 1/20 }, scale: { x: 1.65 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE } } }
+		});
+
+		seeksSlider.addBehavior('holding', (user, data) => {
+			this.holdingSliderPuck = true;
+
+			if (this.isVideoPlaying && !this.isLiveStream) {
+				data.targetedPoints.forEach((pointData) => {
+					let pos = { transform: { local: { position: { x: pointData.localSpacePoint.x, y: 0, z: 0.1 } } } };
+					this.seekSliderPuck.animateTo(pos, 0.01, MRE.AnimationEaseCurves.Linear);
+				});
+			}
+		});
+
+		seeksSlider.addBehavior('released', (user, data) => {
+			this.holdingSliderPuck = false;
+
+			if (this.isVideoPlaying && !this.isLiveStream) {
+				let pointX = data.targetedPoints[0].localSpacePoint.x;
+
+				let seekTime = (this.videoDuration / 1000) * this.normalize(-8, 8, pointX);
+
+				this.currentTime = seekTime * 1000;
+
+				this.videoInstance.setState({ time: seekTime });
+			}
+		});
+
+		this.seekSliderPuck = this.adminControlsContainer.createIcon(MediaController.IconType.SliderPuck, {
+			name: "seekSliderPuck",
+			parentId: seeksSlider.actor.id,
+			transform: {
+				local: {
+					position: { x: -8, y: 0, z: -0.1 },
+					scale: { x: 0.65, y: 1, z: 1 },
+					rotation: MRE.Quaternion.Zero()
 				}
 			}
-		});
+		}).actor;
 
-		const behavior = buttonActor.setBehavior(MRE.ButtonBehavior);
-		behavior.onHover('enter', (user) =>
-		{
+		const volumeSlider = this.adminControlsContainer.createIcon(MediaController.IconType.Slider, {
+			name: "volumeSlider",
+			appearance: { enabled: false },
+			transform: {
+				local: {
+					position: { x: 7.5/20, y: 1.5/20 },
+					scale: { x: 0.25 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE },
+					rotation: MRE.Quaternion.FromEulerAngles(180 * MRE.DegreesToRadians, 90 * MRE.DegreesToRadians, -90 * MRE.DegreesToRadians),
+				}
+			}
+		})
+		
+		volumeSlider.addBehavior('enter', (user) => {
+			let admin = this.admins[user.id.toString()];
 			admin.isControlsHovered = true;
-		});
+			admin.isVolumeSliderHovered = true;
+		})
+		
+		volumeSlider.addBehavior('exit', (user) => {
+			let admin = this.admins[user.id.toString()];
+			admin.isControlsHovered = false;
+			admin.isVolumeSliderHovered = false;
+			
+			setTimeout(() => {
+				if (!admin.isVolumeHovered) {
+					volumeSlider.hide();
+					volumeSlider.disableCollider();
+				}	
+			}, 1500);
+		})
 
-		behavior.onHover('exit', (user) =>
-		{
-			admin.isControlsHovered = false
-		});
+		volumeSlider.addBehavior('released', (user, data) => {
 
-		behavior.onButton('released', (user) =>
-		{
-			if (this.videoPlayerActor)
-				this.adminControlsButtonAction(buttonActor, user);
-		});
-	}
+			let pointX = data.targetedPoints[0].localSpacePoint.x;
 
-	private createTextActor(name: string, parentId: MRE.Guid, content: string, color: MRE.Color3)
-	{
-		this.adminTextActors[name] = MRE.Actor.Create(this.context,
-		{
-			actor:
-			{
-				name: name,
-				parentId: parentId,
-				appearance:
-				{
-					enabled: false
-				},
-				text:
-				{
-					contents: content,
-					height: 0.1,
-					anchor: MRE.TextAnchorLocation.MiddleCenter,
-					color: color
-				},
-				transform:
-				{
-					local:
-					{
-						position: { x: 0, y: 0, z: 0 }
-					}
-				}
+			let pos = { transform: { local: { position: { x: pointX, y: -0.1, z: 0 } } } };
+			this.volumeSliderPuck.animateTo(pos, 0.01, MRE.AnimationEaseCurves.Linear);
+
+			this.volume = this.normalize(-8, 8, pointX);
+
+			if (this.videoInstance && !this.muted) {
+				this.videoInstance.setState({ volume: this.volume });	
 			}
 		});
+
+		this.volumeSliderPuck = this.adminControlsContainer.createIcon(MediaController.IconType.SliderPuck, {
+			name: "volumeSliderPuck",
+			parentId: volumeSlider.actor.id,
+			transform: {
+				local: {
+					position: { x: 0, y: -0.1, z: 0 },
+					scale: { x: 2, y: 1, z: 1 },
+					rotation: MRE.Quaternion.Zero()
+				}
+			}
+		}).actor;
+
+		const volumeBtn = this.adminControlsContainer.createIcon(MediaController.IconType.Volume, {
+			name: "volumeBtn",
+			transform: { local: { position: { x: 7.5/20 } } }
+		});
+		
+		volumeBtn.addBehavior('enter', (user) => {
+			let admin = this.admins[user.id.toString()]
+			admin.isControlsHovered = true;
+			admin.isVolumeHovered = true;
+
+			volumeSlider.show();
+			volumeSlider.enableCollider();
+		});
+		
+		volumeBtn.addBehavior('exit', (user) => 
+		{
+			let admin = this.admins[user.id.toString()]
+			admin.isControlsHovered = false;
+			admin.isVolumeHovered = false;
+
+			setTimeout(() => {
+				if (!admin.isVolumeSliderHovered) {
+					volumeSlider.hide();
+					volumeSlider.disableCollider();
+				}	
+			}, 1500);
+		});
+		
+		volumeBtn.addBehavior('released', (user) => {
+			this.mute(true);
+			volumeBtn.hide();
+			volumeBtn.disableCollider();
+			muteBtn.show();
+			muteBtn.enableCollider();
+		});
+
+		const muteBtn = this.adminControlsContainer.createIcon(MediaController.IconType.Mute, {
+			name: "muteBtn",
+			appearance: { enabled: false },
+			transform: { local: { position: { x: 7.5/20 } } }
+		});
+		
+		muteBtn.addBehavior('released', (user) => {
+			this.mute(false);
+			volumeBtn.show();
+			volumeBtn.enableCollider();
+			muteBtn.hide();
+			muteBtn.disableCollider();
+		});
+
+		this.adminControlsContainer.icons.forEach(e => {
+			if (e.name !== "volumeBtn" && e.name !== "volumeSlider") {
+				e.addBehavior('enter', (user) => handleEnter(user, e)).addBehavior('exit', (user) => handleExit(user, e));
+			}
+		});
+
+		const handleEnter = (user: MRE.User, e: MediaController.Icon) => {
+			let admin = this.admins[user.id.toString()]
+			admin.isControlsHovered = true;
+		};
+
+		const handleExit = (user: MRE.User, e: MediaController.Icon) => {
+			let admin = this.admins[user.id.toString()];
+			admin.isControlsHovered = false;
+		}
 	}
 
-	private async parseUrl(input: string)
-	{		
+	private async parseUrl(input: string) {
+
 		let parsedInputAsURL = URL.parse(input, true);
 		let videoUrl = parsedInputAsURL.href;
 
-		this.showText('Load');
+		this.showLabel('Load');
 
-		if (parsedInputAsURL.protocol === null)
-		{
-			this.showText("InvalidUrl");
+		this.isLiveStream = false;
+
+		if (parsedInputAsURL.protocol === null) {
+			this.showLabel("InvalidUrl");
 			return;
 		}
-
-		if (input.includes('tinyurl'))
-		{
+		if (input.includes('tinyurl')) {
 			videoUrl = await this.handleTinyUrl(parsedInputAsURL);
 		}
-		else if (input.includes('youtube'))
-		{
+		else if (input.includes('youtube')) {
 			videoUrl = await this.handleYoutube(parsedInputAsURL);
 		}
-		else if (input.includes('dlive'))
-		{
+		else if (input.includes('dlive')) {
 			videoUrl = await this.handleDLive(parsedInputAsURL);
 		}
-		else if (input.includes('twitch'))
-		{
+		else if (input.includes('twitch')) {
 			videoUrl = await this.handleTwitch(parsedInputAsURL);
 		}
 
-		if (input.includes('m3u8'))
-		{
+		if (input.includes('m3u8')) {
 			this.isLiveStream = true;
 		}
 
 		return videoUrl;
+
 	}
 
-	private async handleTinyUrl(theUrl: URL.UrlWithParsedQuery)
-	{
+	private async handleTinyUrl(theUrl: URL.UrlWithParsedQuery) {
+
 		let tinyId = "";
 
-		if (theUrl.protocol.includes("tinyurl"))
-		{
+		if (theUrl.protocol.includes("tinyurl")) {
 			tinyId = theUrl.hostname;
 		}
-		else if (theUrl.protocol.includes("http") && theUrl.path)
-		{
+		else if (theUrl.protocol.includes("http") && theUrl.path) {
 			tinyId = theUrl.pathname.substr(1);
 		}
-		else
-		{
-			this.showText("InvalidUrl");
+		else {
+			this.showLabel("InvalidUrl");
 			return;
 		}
 
@@ -348,23 +473,20 @@ export default class VideoPlayer
 
 		//run through parseUrl with new URL
 		return await this.parseUrl(realUrl.url);
+
 	}
 
-	private async handleYoutube(theUrl: URL.UrlWithParsedQuery)
-	{
+	private async handleYoutube(theUrl: URL.UrlWithParsedQuery) {
+
 		let videoId = "";
 
-		if (theUrl.protocol.includes("youtube"))
-		{
+		if (theUrl.protocol.includes("youtube")) {
 			videoId = theUrl.hostname;
 		}
-		else if (theUrl.protocol.includes("http") && theUrl.query.v)
-		{
+		else if (theUrl.protocol.includes("http") && theUrl.query.v) {
 			videoId = theUrl.query.v as string;
-		}
-		else
-		{
-			this.showText("InvalidUrl");
+		} else {
+			this.showLabel("InvalidUrl");
 			return;
 		}
 
@@ -373,67 +495,58 @@ export default class VideoPlayer
 
 		let videoInfo = JSON.parse(unescape(info).match(/(?<=player_response=)[^&]+/)[0]);
 
-		if (videoInfo.playabilityStatus.status === "UNPLAYABLE")
-		{
-			this.showText("YoutubeUnplayable");
+		if (videoInfo.playabilityStatus.status === "UNPLAYABLE") {
+			this.showLabel("YoutubeUnplayable");
 			return;
-		}	
+		}
 
-		if (videoInfo.videoDetails.isLiveContent)
-		{
+		if (videoInfo.videoDetails.isLiveContent) {
 			this.isLiveStream = true;
 
-			if (videoInfo.streamingData.hlsManifestUrl)
-			{
+			if (videoInfo.streamingData.hlsManifestUrl) {
 				return videoInfo.streamingData.hlsManifestUrl;
 			}
 		}
 
-		if (videoInfo.streamingData.adaptiveFormats[0].cipher || 
+		if (videoInfo.streamingData.adaptiveFormats[0].cipher ||
 			videoInfo.streamingData.adaptiveFormats[0].signatureCipher ||
 			videoInfo.streamingData.formats[0].cipher ||
 			videoInfo.streamingData.formats[0].signatureCipher)
 		{
-			this.showText("YoutubeCiphered");
+			this.showLabel("YoutubeCiphered");
 			return;
-		} 
-		
+		}
+
 		return `youtube://${videoId}`;
+
 	}
 
-	private async handleDLive(theUrl: URL.UrlWithParsedQuery)
-	{
+	private async handleDLive(theUrl: URL.UrlWithParsedQuery) {
+
 		let channel = "";
-		
-		if (theUrl.protocol.includes("dlive"))
-		{
+
+		if (theUrl.protocol.includes("dlive")) {
 			channel = theUrl.hostname;
-		}
-		else if (theUrl.protocol.includes("http") && theUrl.pathname !== "")
-		{
+		} else if (theUrl.protocol.includes("http") && theUrl.pathname !== "") {
 			channel = theUrl.pathname.substr(1);
-		}
-		else
-		{
-			this.showText("InvalidUrl");
+		} else {
+			this.showLabel("InvalidUrl");
 			return;
 		}
 
 		let username = await this.scrapeDLive(channel.toLowerCase());
-
 		this.isLiveStream = true;
-
 		return `https://live.prd.dlive.tv/hls/live/${username.toLowerCase()}.m3u8`;
+
 	}
 
-	private async handleTwitch(theUrl: URL.UrlWithParsedQuery)
-	{
+	private async handleTwitch(theUrl: URL.UrlWithParsedQuery) {
+
 		let channel = "";
 		let m3u8Url = "";
 		let shortenedm3u8Url = "";
 
-		if (theUrl.protocol.includes("twitch"))
-		{
+		if (theUrl.protocol.includes("twitch")) {
 			channel = theUrl.hostname;
 			console.log("Twitch channel:" + channel)
 		}
@@ -441,9 +554,8 @@ export default class VideoPlayer
 		//{
 		//	channel = theUrl.pathname.substr(1);
 		//}
-		else
-		{
-			this.showText("InvalidUrl");
+		else {
+			this.showLabel("InvalidUrl");
 			return;
 		}
 
@@ -462,26 +574,24 @@ export default class VideoPlayer
 			});
 	    // we need to shorten the url because there is a bug in Altspace's MRE and the URL can't be very long
 		shortenedm3u8Url = await this.shortenUrl(m3u8Url);
-
 		shortenedm3u8Url + ".m3u8";
 		return shortenedm3u8Url;
+
 	}
 
-	private async createOrUpdateVideoPlayer(theUrl: string)
-	{
-		const options =
-		{
+	private async createOrUpdateVideoPlayer(theUrl: string) {
+
+		const options = {
 			//looping: this.loop,
 			rolloffStartDistance: 1,
 			spread: 0.6,
-			volume: 0.5,
+			volume: this.volume,
 			visible: true
 		};
 
-		this.stop();
+		this.setInitialPlayPauseButtonState();
 
-		if (!this.videoStream || this.videoStream.uri !== theUrl)
-		{
+		if (!this.videoStream || this.videoStream.uri !== theUrl) {
 			this.videoStream = this.videos.createVideoStream('videoStream', { uri: theUrl });
 
 			await this.videoStream.created;
@@ -491,241 +601,215 @@ export default class VideoPlayer
 			if (theUrl.includes('webm') || theUrl.includes('mp4'))
 				this.videoDuration = await getVideoDuration(theUrl) * 1000;
 		}
-		
-		if (this.videoPlayerActor)
-		{
-			this.videoInstance = this.videoPlayerActor.startVideoStream(this.videoStream.id, options);
-			this.videoPlayerActor.appearance.enabled = false;
-		}
-		
-		this.isVideoPlaying = true;
 
-		if (!this.isLiveStream)
-		{
-			this.startTime = Date.now();
-			this.timeRemaining = this.videoDuration;
-			this.createTimer();
-		}		
-		
-		this.adminTextActors[this.adminActiveText].appearance.enabledFor.delete('admin');
-		this.adminActiveText = "";
-
-		this.changePlayPauseButtonState();
-	}
-
-	private adminControlsButtonAction(button: MRE.Actor, user: MRE.User)
-	{
-		switch (button.name)
-		{
-			case 'PlayButton':
-			{
-				if (!this.isVideoPlaying)
-					this.start();
-				break;
-			}
-
-			case 'StopButton':
-			{
-				if (this.isVideoPlaying)
-					this.stop()
-				break;
-			}
-
-			case 'PauseButton':
-			{
-				if (this.isVideoPlaying)
-					this.pause();
-				break;
-			}
-
-			case 'RestartButton':
-			{
-				this.restart();
-
-				break;
-			}
-
-			case 'LoopButton':
-			case 'LoopGreenButton':
-			{
-				this.loop = !this.loop;
-
-				this.changeLoopButtonState();
-
-				break;
-			}
-	
-			default:
-				break;
-		}
-	}
-
-	private start()
-	{
-		this.isVideoPlaying = true;
-
-		this.startTime = Date.now();
-
-		this.createTimer();
-
-		if (this.videoInstance)
-		{
-			this.videoInstance.resume();
-		}
-
-		this.changePlayPauseButtonState();
-	}
-
-	private stop()
-	{
-		this.isVideoPlaying = false;
-
-		clearTimeout(this.videoTimer)
-
-		if (this.videoInstance)
-		{
-			this.videoInstance.stop();
-			this.videoPlayerActor.appearance.enabled = true;
-		}
-
-		this.showText("ClickText");
-
-		this.setInitialPlayPauseButtonState();
-	}
-
-	private pause()
-	{
-		this.isVideoPlaying = false;
-
-		clearTimeout(this.videoTimer)
-		this.timeRemaining -= Date.now() - this.startTime;
-
-		if (this.videoInstance)
-		{
-			this.videoInstance.pause();
-		}
-
-		this.changePlayPauseButtonState();
-	}
-
-	private restart()
-	{
-		if (this.videoInstance)
-		{
-			this.videoInstance.setState({ time: 0 });
-		}
-
-		this.timeRemaining = this.videoDuration;
-
-		this.createTimer()
-	}
-
-	private createTimer()
-	{
-		if (!this.isLiveStream)
-		{
-			clearTimeout(this.videoTimer)
-
-			this.startTime = Date.now();
-
-			this.videoTimer = setTimeout(() =>
-			{
-				if (this.isVideoPlaying)
-				{
-					if (this.loop)
-					{
-						this.restart();
-					}
-					else
-					{
-						this.stop();
-					}
-				}
-
-			}, Math.floor(this.timeRemaining));
-		}
-	}
-
-	private setInitialPlayPauseButtonState()
-	{
-		for (let admin in this.admins)
-		{
-			let playButton = this.admins[admin].controls.findChildrenByName('PlayButton', true)[0];
-			let pauseButton = this.admins[admin].controls.findChildrenByName('PauseButton', false)[0];
-
-			playButton.appearance.enabled = true;
-			playButton.collider.enabled = true;
-
-			pauseButton.appearance.enabled = false;
-			pauseButton.collider.enabled = false;
-		}
-	}
-
-	private changePlayPauseButtonState()
-	{
-		for (let admin in this.admins)
-		{
-			let playButton = this.admins[admin].controls.findChildrenByName('PlayButton', false)[0];
-			let pauseButton = this.admins[admin].controls.findChildrenByName('PauseButton', false)[0];
-
-			playButton.appearance.enabled = !playButton.appearance.enabled
-			playButton.collider.enabled = !playButton.collider.enabled;
-
-			pauseButton.appearance.enabled = !pauseButton.appearance.enabled;
-			pauseButton.collider.enabled = !pauseButton.collider.enabled;
-		}
-	}
-
-	private changeLoopButtonState()
-	{
-		for (let admin in this.admins)
-		{
-			let loopButton = this.admins[admin].controls.findChildrenByName('LoopButton', false)[0];
-			let loopGreenButton = this.admins[admin].controls.findChildrenByName('LoopGreenButton', false)[0];
-
-			loopButton.appearance.enabled = !loopButton.appearance.enabled
-			loopButton.collider.enabled = !loopButton.collider.enabled;
-
-			loopGreenButton.appearance.enabled = !loopGreenButton.appearance.enabled;
-			loopGreenButton.collider.enabled = !loopGreenButton.collider.enabled;
-		}
-	}
-
-	private showText(type: string)
-	{
-		if (this.adminActiveText !== type)
-		{
-			if (this.adminActiveText)
-				this.adminTextActors[this.adminActiveText].appearance.enabledFor.delete('admin');
+		if (this.videoPlayerContainer.actor) {
 			
-			this.adminTextActors[type].appearance.enabledFor.add('admin');
-			this.adminActiveText = type;
+			this.videoInstance = this.videoPlayerContainer.actor.startVideoStream(this.videoStream.id, options);
+			this.videoPlayerContainer.hide()
 		}
+
+		if (this.isLiveStream) {
+			this.mediaDurationLabel = "LIVE";
+		} else {
+			let minutes = '0' + Math.floor((this.videoDuration / (1000*60)) % 60);
+			let seconds = '0' + Math.floor((this.videoDuration / 1000) % 60);
+			this.mediaDurationLabel = `${ minutes.slice(-2) }:${ seconds.slice(-2) }`;
+		}
+
+		this.adminInfoActive.hide();
+		this.isVideoPlaying = true; 
+		this.currentTime = 0;
+		this.changePlayPauseButtonState();
+
 	}
 
-	private checkUserRole(user: MRE.User, role: string)
-	{
+	private play() { 
+
+		if (this.videoInstance) {
+			if (!this.isVideoPlaying) {
+				this.isVideoPlaying = true;
+			
+				this.videoInstance.resume();
+				this.changePlayPauseButtonState();
+			}
+		}
+
+	}
+
+	private stop() {
+
+		if (this.videoInstance) {
+			if (this.isVideoPlaying) {
+				this.isVideoPlaying = false;
+				this.isLiveStream = false;
+
+				this.videoInstance.stop();
+				this.videoInstance = null;
+				this.videoPlayerContainer.show();
+			
+				this.showLabel("ClickText");
+				this.setInitialPlayPauseButtonState();
+
+				this.timeLabel.set(`00:00 / 00:00`);
+			}
+		}
+
+	}
+
+	private pause() {
+
+		if (this.videoInstance) {
+			if (this.isVideoPlaying) {
+				this.isVideoPlaying = false;
+
+				this.videoInstance.pause();
+				this.changePlayPauseButtonState();
+			}
+		}
+
+	}
+
+	private restart() {
+
+		if (this.videoInstance) {
+			this.videoInstance.setState({ time: 0 });
+			this.currentTime = 0;
+		}
+
+	}
+
+	private mute(bool: boolean) {
+
+		this.muted = bool;
+
+		if (this.videoInstance) {
+			if (bool === true) {
+				this.videoInstance.setState({ volume: 0 });
+			} else {
+				this.videoInstance.setState({ volume: this.volume });
+			}
+		}
+
+	}
+
+	private toggleLoop() {
+
+		this.loop = !this.loop;
+
+		let loopOnBtn = this.adminControlsContainer.getIcon('loopOnBtn');
+		let loopOffBtn = this.adminControlsContainer.getIcon('loopOffBtn');
+
+		loopOnBtn.toggleVisibility();
+		loopOffBtn.toggleVisibility();
+
+	}
+
+	private setInitialPlayPauseButtonState() {
+
+		let playBtn = this.adminControlsContainer.getIcon('playBtn');
+		let pauseBtn = this.adminControlsContainer.getIcon('pauseBtn');
+
+		playBtn.show();
+		playBtn.enableCollider();
+
+		pauseBtn.hide();
+		pauseBtn.disableCollider();
+
+	}
+
+	private changePlayPauseButtonState() {
+
+		let playBtn = this.adminControlsContainer.getIcon('playBtn');
+		let pauseBtn = this.adminControlsContainer.getIcon('pauseBtn');
+
+		playBtn.toggleVisibility();
+		playBtn.toggleCollider();
+
+		pauseBtn.toggleVisibility();
+		pauseBtn.toggleCollider();
+
+	}
+
+	private showLabel(name: string) {
+
+		this.adminInfoActive.hide();
+		let label = this.adminInfoContainer.getLabel(name);
+		label.show();
+		this.adminInfoActive = label;
+
+	}
+
+	private checkUserRole(user: MRE.User, role: string) {
+
 		if (user.properties['altspacevr-roles'] === role ||
-		user.properties['altspacevr-roles'].includes(role))
-		{
+		user.properties['altspacevr-roles'].includes(role)) {
 			return true;
 		}
 
 		return false;
+
+	}
+
+	private startLoop() {
+
+		let drift = Date.now() - this.expected;
+
+		if (this.isVideoPlaying) {
+			this.currentTime += this.tickInterval;
+
+			let minutes = '0' + Math.floor((this.currentTime / (1000*60)) % 60);
+			let seconds = '0' + Math.floor((this.currentTime / 1000) % 60);
+
+			this.timeLabel.set(`${ minutes.slice(-2) }:${ seconds.slice(-2) } / ${this.mediaDurationLabel}`);
+
+			let convertedRange = this.convertRange(0, this.videoDuration, -8, 8, this.currentTime);
+
+			if (!this.holdingSliderPuck) {
+				let pos = { transform: { local: { position: { x: convertedRange, y: 0, z: -0.1 } } } };
+				this.seekSliderPuck.animateTo(pos, 0.01, MRE.AnimationEaseCurves.Linear);
+			}
+			
+			if ((this.currentTime >= (this.videoDuration - 500)) && !this.isLiveStream) {
+				if (this.loop) {
+					this.restart();
+				} else {
+					this.stop();
+				}	
+			}
+		}
+
+		this.expected += this.tickInterval;
+		setTimeout(() => { this.startLoop(); }, Math.max(0, this.tickInterval - drift));
+		
 	}
 
 	private async shortenUrl (url: string) {
+
 		let text = await (await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url))).text();
 		return text;
+
 	}
 
-	private async scrapeDLive(channel: string)
-	{
+	private async scrapeDLive(channel: string) {
+
 		let text = await (await fetch(`https://dlive.tv/${channel}`)).text();
 
 		//Regex from https://github.com/streamlink/streamlink
 		let username = text.match(/(?<=user:)(\w|-)+/)[0];
 
 		return username;
+
+	}
+
+	private normalize(min: number, max: number, input: number) {
+
+		return (input - min) / (max - min);
+
+	}
+
+	private convertRange(x: number, y: number, a: number, b: number,input: number) {
+
+		return ((input - x) / (y - x)) * (b - a) + a;
+
 	}
 }
