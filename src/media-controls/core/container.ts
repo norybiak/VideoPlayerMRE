@@ -1,6 +1,7 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
 import { Actor } from './actor';
 import { Icon, Label } from '..';
+import { MreArgumentError } from '@microsoft/mixed-reality-extension-sdk';
 
 export enum IconType {
 
@@ -190,8 +191,7 @@ export class Container extends Actor implements IContainer {
 
         let collider: Partial<MRE.ColliderLike> = {
             ...options.collider,
-            geometry: { shape: MRE.ColliderType.Auto },
-            enabled: true
+            geometry: { shape: MRE.ColliderType.Auto }
         };
 
         let transform: Partial<MRE.ActorTransformLike> = {
@@ -199,7 +199,7 @@ export class Container extends Actor implements IContainer {
             local: {
                 rotation: MRE.Quaternion.FromEulerAngles(-90 * MRE.DegreesToRadians, 0, 0),
                 scale: { x: this._iconScale, y: this._iconScale, z: this._iconScale },
-                ...((options.transform !== undefined) && options.transform.local),
+                ...((options.transform !== undefined) && options.transform.local)
             }
         }
 

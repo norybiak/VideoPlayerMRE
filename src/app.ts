@@ -12,6 +12,8 @@ const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
 const BUTTON_SCALE = 0.02;
 
+const DEBUG = true;
+
 interface Admins {
 
 	controls?: MRE.Actor,
@@ -34,6 +36,7 @@ export default class VideoPlayer {
 
 	// VIDEO PLAYER
 	private videoPlayerContainer: MediaController.Container;
+	private adminVideoPlayerContainer: MediaController.Container;
 	private videoStream: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
 	private videoDuration: number;
@@ -97,6 +100,8 @@ export default class VideoPlayer {
 				isVolumeHovered: false,
 				isVolumeSliderHovered: false
 			};
+		} else {
+			user.groups.set(['user']);
 		}
 
 	}
@@ -109,9 +114,6 @@ export default class VideoPlayer {
 				appearance: {
 					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
 					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
-				},
-				collider: {
-					geometry: { shape: MRE.ColliderType.Auto }
 				}
 			}
 		});
@@ -160,13 +162,12 @@ export default class VideoPlayer {
 			labelScale: 0.1,
 			actor: {
 				name: 'adminTextLayer',
-				parentId: this.videoPlayerContainer.actor.id,
 				appearance: {
 					enabled: new MRE.GroupMask(this.context, ['admin'])
 				},
 				transform: {
 					local: {
-						position: { x: 0, y: 0, z: -0.01 }
+						position: { x: 0, y: 0, z: -0.001 }
 					}
 				}
 			}
@@ -187,6 +188,9 @@ export default class VideoPlayer {
 		this.adminInfoContainer.createLabel("Attempting to load", { 
 			name: "Load", appearance: { enabled: false }
 		});
+		this.adminInfoContainer.createLabel("Failed to get \n live stream!", { 
+			name: "InvalidChannel", appearance: { enabled: false }
+		});
 
 	}
 
@@ -198,16 +202,11 @@ export default class VideoPlayer {
 				appearance: { enabled: new MRE.GroupMask(this.context, ['adminShowControls']) },
 				transform: {
 					local: {
-						position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.01 }
+						position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.001 }
 					}
 				},
 			}
 		});
-
-		let text: Partial<MRE.TextLike> = {
-			height: 0.1,
-			anchor: MRE.TextAnchorLocation.MiddleCenter,
-		}
 
 		this.timeLabel = this.adminControlsContainer.createLabel('', {
 			transform: {
@@ -309,29 +308,33 @@ export default class VideoPlayer {
 		})
 		
 		volumeSlider.addBehavior('enter', (user) => {
-			let admin = this.admins[user.id.toString()];
-			admin.isControlsHovered = true;
-			admin.isVolumeSliderHovered = true;
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()];
+				admin.isControlsHovered = true;
+				admin.isVolumeSliderHovered = true;
+			}
 		})
 		
 		volumeSlider.addBehavior('exit', (user) => {
-			let admin = this.admins[user.id.toString()];
-			admin.isControlsHovered = false;
-			admin.isVolumeSliderHovered = false;
-			
-			setTimeout(() => {
-				if (!admin.isVolumeHovered) {
-					volumeSlider.hide();
-					volumeSlider.disableCollider();
-				}	
-			}, 1500);
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()];
+				admin.isControlsHovered = false;
+				admin.isVolumeSliderHovered = false;
+				
+				setTimeout(() => {
+					if (!admin.isVolumeHovered) {
+						volumeSlider.hide();
+						volumeSlider.disableCollider();
+					}	
+				}, 1500);
+			}
 		})
 
 		volumeSlider.addBehavior('released', (user, data) => {
 
 			let pointX = data.targetedPoints[0].localSpacePoint.x;
 
-			let pos = { transform: { local: { position: { x: pointX, y: -0.1, z: 0 } } } };
+			let pos = { transform: { local: { position: { x: pointX } } } };
 			this.volumeSliderPuck.animateTo(pos, 0.01, MRE.AnimationEaseCurves.Linear);
 
 			this.volume = this.normalize(-8, 8, pointX);
@@ -346,7 +349,7 @@ export default class VideoPlayer {
 			parentId: volumeSlider.actor.id,
 			transform: {
 				local: {
-					position: { x: 0, y: -0.1, z: 0 },
+					position: { x: 0, y: -0.01, z: 0 },
 					scale: { x: 2, y: 1, z: 1 },
 					rotation: MRE.Quaternion.Zero()
 				}
@@ -359,26 +362,29 @@ export default class VideoPlayer {
 		});
 		
 		volumeBtn.addBehavior('enter', (user) => {
-			let admin = this.admins[user.id.toString()]
-			admin.isControlsHovered = true;
-			admin.isVolumeHovered = true;
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()]
+				admin.isControlsHovered = true;
+				admin.isVolumeHovered = true;
 
-			volumeSlider.show();
-			volumeSlider.enableCollider();
+				volumeSlider.show();
+				volumeSlider.enableCollider();
+			}
 		});
 		
-		volumeBtn.addBehavior('exit', (user) => 
-		{
-			let admin = this.admins[user.id.toString()]
-			admin.isControlsHovered = false;
-			admin.isVolumeHovered = false;
+		volumeBtn.addBehavior('exit', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()]
+				admin.isControlsHovered = false;
+				admin.isVolumeHovered = false;
 
-			setTimeout(() => {
-				if (!admin.isVolumeSliderHovered) {
-					volumeSlider.hide();
-					volumeSlider.disableCollider();
-				}	
-			}, 1500);
+				setTimeout(() => {
+					if (!admin.isVolumeSliderHovered) {
+						volumeSlider.hide();
+						volumeSlider.disableCollider();
+					}	
+				}, 1500);
+			}
 		});
 		
 		volumeBtn.addBehavior('released', (user) => {
@@ -410,14 +416,19 @@ export default class VideoPlayer {
 		});
 
 		const handleEnter = (user: MRE.User, e: MediaController.Icon) => {
-			let admin = this.admins[user.id.toString()]
-			admin.isControlsHovered = true;
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()]
+				admin.isControlsHovered = true;
+			}
 		};
 
 		const handleExit = (user: MRE.User, e: MediaController.Icon) => {
-			let admin = this.admins[user.id.toString()];
-			admin.isControlsHovered = false;
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()];
+				admin.isControlsHovered = false;
+			}
 		}
+
 	}
 
 	private async parseUrl(input: string) {
@@ -532,18 +543,28 @@ export default class VideoPlayer {
 		} else {
 			this.showLabel("InvalidUrl");
 			return;
-		} 
+		}
 
-		await fetch(theUrl.href).then((res) => {
-			if (!res.ok) {
-				this.showLabel("InvalidUrl");
+		this.isLiveStream = true;
+
+		let url = `https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`;
+
+		let res = await fetch(url);
+
+		if (res.ok) {
+			return url;
+		} else { 
+			let username = await this.scrapeDLive(channel.toLowerCase());
+
+			if (username === undefined) {
+				this.showLabel("InvalidChannel");
 				return;
 			}
-		});
 
-		let username = await this.scrapeDLive(channel.toLowerCase());
-		this.isLiveStream = true;
-		return `https://live.prd.dlive.tv/hls/live/${username.toLowerCase()}.m3u8`;
+			channel = username;
+		}
+
+		return url;
 
 	}
 
@@ -562,18 +583,26 @@ export default class VideoPlayer {
 			return;
 		}
 
-		await twitchStreams.get(channel).then((streams: { resolution: string, quality: string, url: string }[]) => {	
+		await twitchStreams.get(channel).then((streams: any) => {
 			m3u8Url = streams[0].url;
 				// we could find a resolution that works best instead
 				// for (var stream of streams)
 				//    console.log(stream.quality + ' (' + stream.resolution + '): ' + stream.url);
 		}).catch((error: string) => {
-			if (error)
+			if (error) {
+				this.showLabel("InvalidChannel");
 				return console.log('Error caught:', error);
+			}
 		});
 
 	    // we need to shorten the url because there is a bug in Altspace's MRE and the URL can't be very long
 		shortenedm3u8Url = await this.shortenUrl(m3u8Url);
+
+		if (!shortenedm3u8Url) {
+			this.showLabel("InvalidChannel");
+			return;
+		}
+
 		shortenedm3u8Url + ".m3u8";
 		this.isLiveStream = true;
 		return shortenedm3u8Url;
@@ -592,11 +621,10 @@ export default class VideoPlayer {
 
 		this.setInitialPlayPauseButtonState();
 
-		if (!this.videoStream || this.videoStream.uri !== theUrl) {
+		if (!this.videoStream || this.videoStream.uri !== theUrl) {	
 			this.videoStream = this.videos.createVideoStream('videoStream', { uri: theUrl });
-
+			
 			await this.videoStream.created;
-
 			this.videoDuration = this.videoStream.duration * 1000;
 
 			if (theUrl.includes('webm') || theUrl.includes('mp4'))
@@ -640,19 +668,17 @@ export default class VideoPlayer {
 	private stop() {
 
 		if (this.videoInstance) {
-			if (this.isVideoPlaying) {
-				this.isVideoPlaying = false;
-				this.isLiveStream = false;
+			this.isVideoPlaying = false;
+			this.isLiveStream = false;
 
-				this.videoInstance.stop();
-				this.videoInstance = null;
-				this.videoPlayerContainer.show();
-			
-				this.showLabel("ClickText");
-				this.setInitialPlayPauseButtonState();
+			this.videoInstance.stop();
+			this.videoInstance = null;
+			this.videoPlayerContainer.show();
+		
+			this.showLabel("ClickText");
+			this.setInitialPlayPauseButtonState();
 
-				this.timeLabel.set(`00:00 / 00:00`);
-			}
+			this.timeLabel.set(`00:00 / 00:00`);
 		}
 
 	}
@@ -786,20 +812,34 @@ export default class VideoPlayer {
 
 	private async shortenUrl (url: string) {
 
-		let text = await (await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url))).text();
+		let res = await fetch(`https://is.gd/create.php?format=simple&url=` + encodeURIComponent(url));
 
-		return text;
+		if (!res.ok) {
+			return undefined;
+		}
 
+		return await res.text();
 	}
 
 	private async scrapeDLive(channel: string) {
 
-		let text = await (await fetch(`https://dlive.tv/${channel}`)).text();
+		let res = await fetch(`https://dlive.tv/${channel}`);
+
+		if (!res.ok) {
+			return undefined;
+		}
+
+		let text = await res.text();
 
 		//Regex from https://github.com/streamlink/streamlink
-		let username = text.match(/(?<=user:)(\w|-)+/)[0];
+		let username = text.match(/(?<=user:)(\w|-)+/);
 
-		return username;
+		if (username !== null && username !== undefined) {
+			return username[0];
+		}
+		else {
+			return undefined;
+		}
 
 	}
 
