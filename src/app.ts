@@ -517,10 +517,16 @@ export default class VideoPlayer {
 			}
 		}
 
-		if (videoInfo.streamingData.adaptiveFormats[0].cipher ||
-			videoInfo.streamingData.adaptiveFormats[0].signatureCipher ||
-			videoInfo.streamingData.formats[0].cipher ||
-			videoInfo.streamingData.formats[0].signatureCipher)
+		if (
+			videoInfo.streamingData.adaptiveFormats && (
+				videoInfo.streamingData?.adaptiveFormats[0]?.cipher ||
+				videoInfo.streamingData?.adaptiveFormats[0]?.signatureCipher
+			) ||
+			videoInfo.streamingData.formats && (
+				videoInfo.streamingData?.formats[0]?.cipher ||
+				videoInfo.streamingData?.formats[0]?.signatureCipher
+			)
+		)
 		{
 			this.showLabel("YoutubeCiphered");
 			return;
