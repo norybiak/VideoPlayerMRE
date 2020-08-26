@@ -12,8 +12,6 @@ const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
 const BUTTON_SCALE = 0.02;
 
-const DEBUG = true;
-
 interface Admins {
 
 	controls?: MRE.Actor,
