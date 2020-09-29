@@ -1,6 +1,6 @@
 {
   "include": [
-    "./src"
+    "./src", "./types/**/*.d.ts"
   ],
   "compilerOptions": {
     "outDir": "./built", /* Redirect output structure to the directory. */
