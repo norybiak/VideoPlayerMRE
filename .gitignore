@@ -3,3 +3,4 @@ built/
 *.tsbuildinfo
 .eslintcache
 .env
+*.log

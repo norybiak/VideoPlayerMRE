@@ -3,8 +3,7 @@ import Server from './server';
 import getVideoDuration from 'get-video-duration';
 import URL from 'url';
 import fetch from 'node-fetch';
-// @ts-ignore
-import twitchStreams from 'twitch-get-stream';
+import * as TwitchStreams from 'twitch-get-stream';
 
 import * as MediaController from './media-controls';
 
@@ -552,24 +551,19 @@ export default class VideoPlayer {
 		this.isLiveStream = true;
 
 		let url = `https://live.prd.dlive.tv/hls/live/${channel.toLowerCase()}.m3u8`;
-
 		let res = await fetch(url);
 
-		if (res.ok) {
-			return url;
-		} else { 
-			let username = await this.scrapeDLive(channel.toLowerCase());
-
-			if (username === undefined) {
-				this.showLabel("InvalidChannel");
-				return;
+		if (!res.ok) {
+			try {
+				const username = await this.getDLiveUsername(channel.toLowerCase());
+				url = `https://live.prd.dlive.tv/hls/live/${username.toLowerCase()}.m3u8`
+			} catch (err) {
+				this.showLabel(err);
+				return
 			}
-
-			channel = username;
 		}
 
 		return url;
-
 	}
 
 	private async handleTwitch(theUrl: URL.UrlWithParsedQuery) {
@@ -587,7 +581,7 @@ export default class VideoPlayer {
 			return;
 		}
 
-		await twitchStreams.get(channel).then((streams: any) => {
+		await TwitchStreams.get(channel).then((streams: any) => {
 			m3u8Url = streams[0].url;
 				// we could find a resolution that works best instead
 				// for (var stream of streams)
@@ -825,26 +819,28 @@ export default class VideoPlayer {
 		return await res.text();
 	}
 
-	private async scrapeDLive(channel: string) {
+	private async getDLiveUsername(displayName: string): Promise<string> {
+		return new Promise<string>((resolve, reject) => {
+			const query = `query{
+				userByDisplayName(displayname:"${displayName}") {
+					username
+					displayname
+				}
+			}`
 
-		let res = await fetch(`https://dlive.tv/${channel}`);
-
-		if (!res.ok) {
-			return undefined;
-		}
-
-		let text = await res.text();
-
-		//Regex from https://github.com/streamlink/streamlink
-		let username = text.match(/(?<=user:)(\w|-)+/);
-
-		if (username !== null && username !== undefined) {
-			return username[0];
-		}
-		else {
-			return undefined;
-		}
-
+			fetch('https://graphigo.prd.dlive.tv/', {
+				method: 'POST',
+				body: JSON.stringify({query}),
+			})
+			.then(res => res.text())
+			.then(body => {
+				const jsonBody = JSON.parse(body);
+				resolve(jsonBody.data.userByDisplayName.username);
+			})
+			.catch(err => {
+				reject("Failed to obtain username for dlive channel");
+			});
+		});
 	}
 
 	private normalize(min: number, max: number, input: number) {
