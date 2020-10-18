@@ -4,8 +4,6 @@ import getVideoDuration from 'get-video-duration';
 import URL from 'url';
 import fetch from 'node-fetch';
 import * as TwitchStreams from 'twitch-get-stream';
-
-import * as MediaController from './media-controls';
 import * as MREUI from './UI';
 
 const VIDEO_PLAYER_WIDTH = 1;
