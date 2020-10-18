@@ -4,3 +4,6 @@ built/
 .eslintcache
 .env
 *.log
+.package-lock
+.deployment
+*.blend1
