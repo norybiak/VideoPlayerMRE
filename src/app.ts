@@ -1,11 +1,12 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
-import Server from './server';
+import server from './server';
 import getVideoDuration from 'get-video-duration';
 import URL from 'url';
 import fetch from 'node-fetch';
 import * as TwitchStreams from 'twitch-get-stream';
 
 import * as MediaController from './media-controls';
+import * as MREUI from './UI';
 
 const VIDEO_PLAYER_WIDTH = 1;
 const VIDEO_PLAYER_HEIGHT = 1 / (16/9);
@@ -29,11 +30,13 @@ export default class VideoPlayer {
 	private assets: MRE.AssetContainer;
 	private videos: MRE.AssetContainer;
 
+	private UI: MREUI.UI;
+
 	private admins: { [key: string]: Admins } = {};
 
 	// VIDEO PLAYER
-	private videoPlayerContainer: MediaController.Container;
-	private adminVideoPlayerContainer: MediaController.Container;
+	private UIvideoPlayerGroup: MREUI.Group;
+	private UIadminVideoPlayerGroup: MREUI.Group;
 	private videoStream: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
 	private videoDuration: number;
@@ -45,17 +48,17 @@ export default class VideoPlayer {
 	private isLiveStream: boolean = false;
 	private muted: boolean = false;
 
-	// MODERATOR MEDIA CONTROLS
-	private adminControlsContainer: MediaController.Container;
+	// MODERATOR UI MEDIA CONTROLS
+	private UIadminControlsGroup: MREUI.Group;
 	private seekSliderPuck: MRE.Actor;
 	private volumeSliderPuck: MRE.Actor;
-	private timeLabel: MediaController.Label;
+	private UItimeLabel: MREUI.Label;
 	private mediaDurationLabel: string;
 	private holdingSliderPuck: boolean = false;
 
-	// MODERATOR VIDEO PLAYER TEXT
-	private adminInfoContainer: MediaController.Container;
-	private adminInfoActive: MediaController.Label;
+	// MODERATOR UI VIDEO PLAYER TEXT
+	private UIadminInfoGroup: MREUI.Group;
+	private UIactiveInfo: MREUI.Label;
 
 	//LOOP
 	private tick = 10;
@@ -70,6 +73,10 @@ export default class VideoPlayer {
 		this.videos = new MRE.AssetContainer(context);
 		this.assets = new MRE.AssetContainer(context);
 
+		this.UI = new MREUI.UI(this.context, {
+			scale: BUTTON_SCALE
+		});
+
 		this.context.onStarted(() => this.init());
 		this.context.onUserJoined((user) => this.handleUser(user));
 
@@ -78,12 +85,11 @@ export default class VideoPlayer {
 	/**
 	 * Once the context is "started", initialize the app.
 	 */
-	private async init() {
+	private init() {
 
-		this.createVideoPlayerContainer();
-		this.createVideoPlayerInfoLabels()
-		this.createAdminControls();
+		this.createUI();
 		this.startLoop();
+
 	}
 
 	private handleUser(user: MRE.User) {
@@ -103,11 +109,20 @@ export default class VideoPlayer {
 
 	}
 
-	private createVideoPlayerContainer() {
+	private async createUI() {
 
-		this.videoPlayerContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
+		await this.UI.loadIconPack(`${server.baseUrl}/iconPacks/media`);
+	
+		this.createVideoPlayer();
+		this.createVideoPlayerInfoLabels()
+		this.createAdminControls();
+
+	}
+
+	private createVideoPlayer() {
+
+		this.UIvideoPlayerGroup = this.UI.createGroup('UIvideoPlayerGroup', {
 			actor: {
-				name: 'videoPlayerContainer',
 				appearance: {
 					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
 					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
@@ -115,7 +130,7 @@ export default class VideoPlayer {
 			}
 		});
 
-		this.videoPlayerContainer.addBehavior('enter', (user) => {
+		this.UIvideoPlayerGroup.addBehavior('enter', (user) => {
 			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()];
 				admin.isVideoPlayerHovered = true;
@@ -123,7 +138,7 @@ export default class VideoPlayer {
 			}
 		});
 
-		this.videoPlayerContainer.addBehavior('exit', (user) => {
+		this.UIvideoPlayerGroup.addBehavior('exit', (user) => {
 			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()];
 				admin.isVideoPlayerHovered = false;
@@ -136,7 +151,7 @@ export default class VideoPlayer {
 			}
 		});
 
-		this.videoPlayerContainer.addBehavior('click', (user) => {
+		this.UIvideoPlayerGroup.addBehavior('click', (user) => {
 			if (this.checkUserRole(user, 'moderator')) {
 				user.prompt("Enter Video URL", true).then((dialog) => {
 					if (dialog.submitted) {
@@ -155,104 +170,80 @@ export default class VideoPlayer {
 
 	private createVideoPlayerInfoLabels() {
 
-		this.adminInfoContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
-			labelScale: 0.1,
-			actor: {
-				name: 'adminTextLayer',
-				appearance: {
-					enabled: new MRE.GroupMask(this.context, ['admin'])
-				},
-				transform: {
-					local: {
-						position: { x: 0, y: 0, z: -0.001 }
-					}
-				}
-			}
+		this.UIadminInfoGroup = this.UI.createGroup('adminTextLayer', {
+			groupScale: 0.1,
+			mask: new MRE.GroupMask(this.context, ['admin']),
+			position: { x: 0, y: 0, z: -0.001 }
 		});
 
-		this.adminInfoActive = this.adminInfoContainer.createLabel("Click to enter URL", {
-			name: "ClickText", appearance: { enabled: true }
+		this.UIactiveInfo = this.UIadminInfoGroup.createLabel("Click to enter URL", {
+			name: "ClickText"
 		});
-		this.adminInfoContainer.createLabel("This video cannot \n be played due \n to copyright", { 
-			name: "YoutubeCiphered", appearance: { enabled: false }
+		this.UIadminInfoGroup.createLabel("This video cannot \n be played due \n to copyright", { 
+			name: "YoutubeCiphered", enabled: false
 		});	
-		this.adminInfoContainer.createLabel("This video is \n not viewable \n outside of \n Youtube.com", { 
-			name: "YoutubeUnplayable", appearance: { enabled: false }
+		this.UIadminInfoGroup.createLabel("This video is \n not viewable \n outside of \n Youtube.com", { 
+			name: "YoutubeUnplayable", enabled: false
 		});
-		this.adminInfoContainer.createLabel("Invalid URL", { 
-			name: "InvalidUrl", appearance: { enabled: false }
+		this.UIadminInfoGroup.createLabel("Invalid URL", { 
+			name: "InvalidUrl", enabled: false
 		});
-		this.adminInfoContainer.createLabel("Attempting to load", { 
-			name: "Load", appearance: { enabled: false }
+		this.UIadminInfoGroup.createLabel("Attempting to load", { 
+			name: "Load", enabled: false
 		});
-		this.adminInfoContainer.createLabel("Failed to get \n live stream!", { 
-			name: "InvalidChannel", appearance: { enabled: false }
+		this.UIadminInfoGroup.createLabel("Failed to get \n live stream!", { 
+			name: "InvalidChannel", enabled: false
 		});
 
 	}
 
 	private async createAdminControls() {
 
-		this.adminControlsContainer = new MediaController.Container(this.context, this.assets, Server.baseUrl, {
-			iconScale: BUTTON_SCALE,
-			actor: {
-				appearance: { enabled: new MRE.GroupMask(this.context, ['adminShowControls']) },
-				transform: {
-					local: {
-						position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.001 }
-					}
-				},
-			}
+		this.UIadminControlsGroup = this.UI.createGroup('UIadminControlsGroup', {
+			mask: new MRE.GroupMask(this.context, ['adminShowControls']),
+			position: { x: 0, y: -(VIDEO_PLAYER_HEIGHT/2) + 1/20, z: -0.001 }
 		});
 
-		this.timeLabel = this.adminControlsContainer.createLabel('', {
-			transform: {
-				local: {
-					position: { x: 1.5/20, y: -0.5/20 }
-				}
-			},
-			text: {
-				height: 0.02
-			}
+		this.UItimeLabel = this.UIadminControlsGroup.createLabel('', {
+			position: { x: 1.5/20, y: -0.5/20 },
+			height: 0.02
 		});
 
-		await this.adminControlsContainer.loadGltf();
-
-		this.adminControlsContainer.createIcon(MediaController.IconType.Play, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Play, {
 			name: "playBtn",
-			transform: { local: { position: { x: -9/20 } } }
+			position: { x: -9/20 }
 		}).addBehavior('released', () => this.play())
 
-		this.adminControlsContainer.createIcon(MediaController.IconType.Pause, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Pause, {
 			name: "pauseBtn",
-			appearance: { enabled: false },
-			transform: { local: { position: { x: -9/20 } } }
+			enabled: false,
+			position: { x: -9/20 }
 		}).addBehavior('released', () => this.pause());
 
-		this.adminControlsContainer.createIcon(MediaController.IconType.Stop, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Stop, {
 			name: "stopBtn",
-			transform: { local: { position: { x: -7.5/20 } } }
+			position: { x: -7.5/20 }
 		}).addBehavior('released', () => this.stop());
 
-		this.adminControlsContainer.createIcon(MediaController.IconType.Restart, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Restart, {
 			name: "restartBt",
-			transform: { local: { position: { x: -6/20 } } }
+			position: { x: -6/20 }
 		}).addBehavior('released', () => this.restart());
 
-		this.adminControlsContainer.createIcon(MediaController.IconType.LoopOn, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.LoopOn, {
 			name: "loopOnBtn",
-			appearance: { enabled: false },
-			transform: { local: { position: { x: 9/20 } } }
+			enabled: false,
+			position: { x: 9/20 }
 		}).addBehavior('released', () => this.toggleLoop());
 
-		this.adminControlsContainer.createIcon(MediaController.IconType.LoopOff, {
+		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.LoopOff, {
 			name: "loopOffBtn",
-			transform: { local: { position: { x: 9/20 } } }
+			position: { x: 9/20 }
 		}).addBehavior('released', () => this.toggleLoop());
 
-		const seeksSlider = this.adminControlsContainer.createIcon(MediaController.IconType.Slider, {
+		const seeksSlider = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Slider, {
 			name: "seekSlider",
-			transform: { local: { position: { x: 1/20 }, scale: { x: 1.65 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE } } }
+			position: { x: 1/20 }, scale: { x: 1.65 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE }
 		});
 
 		seeksSlider.addBehavior('holding', (user, data) => {
@@ -280,28 +271,20 @@ export default class VideoPlayer {
 			}
 		});
 
-		this.seekSliderPuck = this.adminControlsContainer.createIcon(MediaController.IconType.SliderPuck, {
+		this.seekSliderPuck = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.SliderPuck, {
 			name: "seekSliderPuck",
 			parentId: seeksSlider.actor.id,
-			transform: {
-				local: {
-					position: { x: -8, y: 0, z: -0.1 },
-					scale: { x: 0.65, y: 1, z: 1 },
-					rotation: MRE.Quaternion.Zero()
-				}
-			}
+			position: { x: -8, y: 0, z: -0.1 },
+			scale: { x: 0.65, y: 1, z: 1 },
+			rotation: MRE.Quaternion.Zero()
 		}).actor;
 
-		const volumeSlider = this.adminControlsContainer.createIcon(MediaController.IconType.Slider, {
+		const volumeSlider = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Slider, {
 			name: "volumeSlider",
-			appearance: { enabled: false },
-			transform: {
-				local: {
-					position: { x: 7.5/20, y: 1.5/20 },
-					scale: { x: 0.25 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE },
-					rotation: MRE.Quaternion.FromEulerAngles(180 * MRE.DegreesToRadians, 90 * MRE.DegreesToRadians, -90 * MRE.DegreesToRadians),
-				}
-			}
+			enabled: false,
+			position: { x: 7.5/20, y: 1.5/20 },
+			scale: { x: 0.25 * BUTTON_SCALE, y: BUTTON_SCALE, z: BUTTON_SCALE },
+			rotation: MRE.Quaternion.FromEulerAngles(180 * MRE.DegreesToRadians, 90 * MRE.DegreesToRadians, -90 * MRE.DegreesToRadians),
 		})
 		
 		volumeSlider.addBehavior('enter', (user) => {
@@ -341,21 +324,17 @@ export default class VideoPlayer {
 			}
 		});
 
-		this.volumeSliderPuck = this.adminControlsContainer.createIcon(MediaController.IconType.SliderPuck, {
+		this.volumeSliderPuck = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.SliderPuck, {
 			name: "volumeSliderPuck",
 			parentId: volumeSlider.actor.id,
-			transform: {
-				local: {
-					position: { x: 0, y: -0.01, z: 0 },
-					scale: { x: 2, y: 1, z: 1 },
-					rotation: MRE.Quaternion.Zero()
-				}
-			}
+			position: { x: 0, y: -0.01, z: 0 },
+			scale: { x: 2, y: 1, z: 1 },
+			rotation: MRE.Quaternion.Zero()
 		}).actor;
 
-		const volumeBtn = this.adminControlsContainer.createIcon(MediaController.IconType.Volume, {
+		const volumeBtn = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Volume, {
 			name: "volumeBtn",
-			transform: { local: { position: { x: 7.5/20 } } }
+			position: { x: 7.5/20 }
 		});
 		
 		volumeBtn.addBehavior('enter', (user) => {
@@ -392,10 +371,10 @@ export default class VideoPlayer {
 			muteBtn.enableCollider();
 		});
 
-		const muteBtn = this.adminControlsContainer.createIcon(MediaController.IconType.Mute, {
+		const muteBtn = this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Mute, {
 			name: "muteBtn",
-			appearance: { enabled: false },
-			transform: { local: { position: { x: 7.5/20 } } }
+			enabled: false,
+			position: { x: 7.5/20 }
 		});
 		
 		muteBtn.addBehavior('released', (user) => {
@@ -406,20 +385,20 @@ export default class VideoPlayer {
 			muteBtn.disableCollider();
 		});
 
-		this.adminControlsContainer.icons.forEach(e => {
+		this.UIadminControlsGroup.icons.forEach(e => {
 			if (e.name !== "volumeBtn" && e.name !== "volumeSlider") {
 				e.addBehavior('enter', (user) => handleEnter(user, e)).addBehavior('exit', (user) => handleExit(user, e));
 			}
 		});
 
-		const handleEnter = (user: MRE.User, e: MediaController.Icon) => {
+		const handleEnter = (user: MRE.User, e: MREUI.Icon) => {
 			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()]
 				admin.isControlsHovered = true;
 			}
 		};
 
-		const handleExit = (user: MRE.User, e: MediaController.Icon) => {
+		const handleExit = (user: MRE.User, e: MREUI.Icon) => {
 			if (this.checkUserRole(user, 'moderator')) {
 				let admin = this.admins[user.id.toString()];
 				admin.isControlsHovered = false;
@@ -629,10 +608,10 @@ export default class VideoPlayer {
 				this.videoDuration = await getVideoDuration(theUrl) * 1000;
 		}
 
-		if (this.videoPlayerContainer.actor) {
+		if (this.UIvideoPlayerGroup.actor) {
 			
-			this.videoInstance = this.videoPlayerContainer.actor.startVideoStream(this.videoStream.id, options);
-			this.videoPlayerContainer.hide()
+			this.videoInstance = this.UIvideoPlayerGroup.actor.startVideoStream(this.videoStream.id, options);
+			this.UIvideoPlayerGroup.hide()
 		}
 
 		if (this.isLiveStream) {
@@ -643,7 +622,7 @@ export default class VideoPlayer {
 			this.mediaDurationLabel = `${ minutes.slice(-2) }:${ seconds.slice(-2) }`;
 		}
 
-		this.adminInfoActive.hide();
+		this.UIactiveInfo.hide();
 		this.isVideoPlaying = true; 
 		this.currentTime = 0;
 		this.changePlayPauseButtonState();
@@ -671,12 +650,12 @@ export default class VideoPlayer {
 
 			this.videoInstance.stop();
 			this.videoInstance = null;
-			this.videoPlayerContainer.show();
+			this.UIvideoPlayerGroup.show();
 		
 			this.showLabel("ClickText");
 			this.setInitialPlayPauseButtonState();
 
-			this.timeLabel.set(`00:00 / 00:00`);
+			this.UItimeLabel.set(`00:00 / 00:00`);
 		}
 
 	}
@@ -721,8 +700,8 @@ export default class VideoPlayer {
 
 		this.loop = !this.loop;
 
-		let loopOnBtn = this.adminControlsContainer.getIcon('loopOnBtn');
-		let loopOffBtn = this.adminControlsContainer.getIcon('loopOffBtn');
+		let loopOnBtn = this.UIadminControlsGroup.getIconByName('loopOnBtn');
+		let loopOffBtn = this.UIadminControlsGroup.getIconByName('loopOffBtn');
 
 		loopOnBtn.toggleVisibility();
 		loopOffBtn.toggleVisibility();
@@ -731,8 +710,8 @@ export default class VideoPlayer {
 
 	private setInitialPlayPauseButtonState() {
 
-		let playBtn = this.adminControlsContainer.getIcon('playBtn');
-		let pauseBtn = this.adminControlsContainer.getIcon('pauseBtn');
+		let playBtn = this.UIadminControlsGroup.getIconByName('playBtn');
+		let pauseBtn = this.UIadminControlsGroup.getIconByName('pauseBtn');
 
 		playBtn.show();
 		playBtn.enableCollider();
@@ -744,8 +723,8 @@ export default class VideoPlayer {
 
 	private changePlayPauseButtonState() {
 
-		let playBtn = this.adminControlsContainer.getIcon('playBtn');
-		let pauseBtn = this.adminControlsContainer.getIcon('pauseBtn');
+		let playBtn = this.UIadminControlsGroup.getIconByName('playBtn');
+		let pauseBtn = this.UIadminControlsGroup.getIconByName('pauseBtn');
 
 		playBtn.toggleVisibility();
 		playBtn.toggleCollider();
@@ -757,10 +736,10 @@ export default class VideoPlayer {
 
 	private showLabel(name: string) {
 
-		this.adminInfoActive.hide();
-		let label = this.adminInfoContainer.getLabel(name);
+		this.UIactiveInfo.hide();
+		let label = this.UIadminInfoGroup.getLabelByName(name);
 		label.show();
-		this.adminInfoActive = label;
+		this.UIactiveInfo = label;
 
 	}
 
@@ -785,7 +764,7 @@ export default class VideoPlayer {
 			let minutes = '0' + Math.floor((this.currentTime / (1000*60)) % 60);
 			let seconds = '0' + Math.floor((this.currentTime / 1000) % 60);
 
-			this.timeLabel.set(`${ minutes.slice(-2) }:${ seconds.slice(-2) } / ${this.mediaDurationLabel}`);
+			this.UItimeLabel.set(`${ minutes.slice(-2) }:${ seconds.slice(-2) } / ${this.mediaDurationLabel}`);
 
 			let convertedRange = this.convertRange(0, this.videoDuration, -8, 8, this.currentTime);
 
