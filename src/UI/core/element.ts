@@ -26,4 +26,10 @@ export abstract class Element extends Actor {
 
     }
 
+    public created() {
+
+        return this._actor.created();
+
+    }
+
 }

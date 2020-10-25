@@ -4,6 +4,7 @@ import getVideoDuration from 'get-video-duration';
 import URL from 'url';
 import fetch from 'node-fetch';
 import * as TwitchStreams from 'twitch-get-stream';
+import Manifest from './manifest';
 import * as MREUI from './UI';
 
 const VIDEO_PLAYER_WIDTH = 1;
@@ -33,8 +34,7 @@ export default class VideoPlayer {
 	private admins: { [key: string]: Admins } = {};
 
 	// VIDEO PLAYER
-	private UIvideoPlayerGroup: MREUI.Group;
-	private UIadminVideoPlayerGroup: MREUI.Group;
+	private UIvideoPlayer: MREUI.Group;
 	private videoStream: MRE.VideoStream;
 	private videoInstance: MRE.MediaInstance;
 	private videoDuration: number;
@@ -66,6 +66,11 @@ export default class VideoPlayer {
 	// TIMES
 	private currentTime: number;
 
+	//DB
+	private manifest: Manifest;
+
+	private appReady: Promise<void>;
+
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
 
 		this.videos = new MRE.AssetContainer(context);
@@ -75,7 +80,15 @@ export default class VideoPlayer {
 			scale: BUTTON_SCALE
 		});
 
-		this.context.onStarted(() => this.init());
+		let promiseCallbacks: { resolve: (value?: void | PromiseLike<void>) => void, reject: (reason?: any) => void};
+
+		this.appReady = new Promise((resolve, reject) => {  promiseCallbacks = { resolve, reject };   });
+
+		this.context.onStarted(async () => {
+			await this.init();
+			promiseCallbacks.resolve();
+		});
+
 		this.context.onUserJoined((user) => this.handleUser(user));
 
 	}
@@ -83,14 +96,14 @@ export default class VideoPlayer {
 	/**
 	 * Once the context is "started", initialize the app.
 	 */
-	private init() {
+	private async init() {
 
-		this.createUI();
+		await this.createUI();
 		this.startLoop();
 
 	}
 
-	private handleUser(user: MRE.User) {
+	private async handleUser(user: MRE.User) {
 
 		if (this.checkUserRole(user, 'moderator')) {
 			user.groups.set(['admin']);
@@ -105,64 +118,29 @@ export default class VideoPlayer {
 			user.groups.set(['user']);
 		}
 
+		if (!this.manifest) {
+
+			let eventId = user.properties['altspacevr-space-id'];
+			let sessionId = this.context.sessionId;
+
+			this.manifest = new Manifest(eventId, sessionId);
+			await this.manifest.ready;
+
+			if (this.manifest.currentVideo !== undefined) {
+				await this.appReady;
+				this.createOrUpdateVideoPlayer(this.manifest.currentVideo);
+			}
+		}
+
 	}
 
 	private async createUI() {
 
 		await this.UI.loadIconPack(`${server.baseUrl}/iconPacks/media`);
-	
-		this.createVideoPlayer();
+
 		this.createVideoPlayerInfoLabels()
-		this.createAdminControls();
-
-	}
-
-	private createVideoPlayer() {
-
-		this.UIvideoPlayerGroup = this.UI.createGroup('UIvideoPlayerGroup', {
-			actor: {
-				appearance: {
-					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
-					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
-				}
-			}
-		});
-
-		this.UIvideoPlayerGroup.addBehavior('enter', (user) => {
-			if (this.checkUserRole(user, 'moderator')) {
-				let admin = this.admins[user.id.toString()];
-				admin.isVideoPlayerHovered = true;
-				user.groups.add('adminShowControls');
-			}
-		});
-
-		this.UIvideoPlayerGroup.addBehavior('exit', (user) => {
-			if (this.checkUserRole(user, 'moderator')) {
-				let admin = this.admins[user.id.toString()];
-				admin.isVideoPlayerHovered = false;
-
-				setTimeout(() => {
-					if (!admin.isVideoPlayerHovered && !admin.isControlsHovered) {
-						user.groups.delete('adminShowControls');
-					}	
-				}, 1000);
-			}
-		});
-
-		this.UIvideoPlayerGroup.addBehavior('click', (user) => {
-			if (this.checkUserRole(user, 'moderator')) {
-				user.prompt("Enter Video URL", true).then((dialog) => {
-					if (dialog.submitted) {
-						this.stop();
-						this.parseUrl(dialog.text).then((url) => {
-							if (url) {
-								this.createOrUpdateVideoPlayer(url);
-							}
-						});
-					}
-				});
-			}
-		});
+		await this.createVideoPlayer();
+		await this.createAdminControls();
 
 	}
 
@@ -195,6 +173,58 @@ export default class VideoPlayer {
 
 	}
 
+	private async createVideoPlayer() {
+
+		this.UIvideoPlayer = this.UI.createGroup('UIvideoPlayer', {
+			actor: {
+				appearance: {
+					meshId: this.assets.createBoxMesh('box', VIDEO_PLAYER_WIDTH, VIDEO_PLAYER_HEIGHT, 0.0001).id,
+					materialId: this.assets.createMaterial('material', { color: MRE.Color3.Black() }).id,
+				}
+			}
+		});
+
+		this.UIvideoPlayer.addBehavior('enter', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()];
+				admin.isVideoPlayerHovered = true;
+				user.groups.add('adminShowControls');
+			}
+		});
+
+		this.UIvideoPlayer.addBehavior('exit', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
+				let admin = this.admins[user.id.toString()];
+				admin.isVideoPlayerHovered = false;
+
+				setTimeout(() => {
+					if (!admin.isVideoPlayerHovered && !admin.isControlsHovered) {
+						user.groups.delete('adminShowControls');
+					}	
+				}, 1000);
+			}
+		});
+
+		this.UIvideoPlayer.addBehavior('click', (user) => {
+			if (this.checkUserRole(user, 'moderator')) {
+				user.prompt("Enter Video URL", true).then((dialog) => {
+					if (dialog.submitted) {
+						this.stop();
+						this.parseUrl(dialog.text).then((url) => {
+							if (url) {
+								this.createOrUpdateVideoPlayer(url);
+								this.manifest.updateCurrentVideo(url);
+							}
+						});
+					}
+				});
+			}
+		});
+
+		await this.UIvideoPlayer.actor.created();
+
+	}
+
 	private async createAdminControls() {
 
 		this.UIadminControlsGroup = this.UI.createGroup('UIadminControlsGroup', {
@@ -207,16 +237,16 @@ export default class VideoPlayer {
 			height: 0.02
 		});
 
-		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Play, {
+		await this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Play, {
 			name: "playBtn",
 			position: { x: -9/20 }
-		}).addBehavior('released', () => this.play())
+		}).addBehavior('released', () => this.play()).created();
 
-		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Pause, {
+		await this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Pause, {
 			name: "pauseBtn",
 			enabled: false,
 			position: { x: -9/20 }
-		}).addBehavior('released', () => this.pause());
+		}).addBehavior('released', () => this.pause()).created();
 
 		this.UIadminControlsGroup.createIcon(MREUI.MediaIcons.Stop, {
 			name: "stopBtn",
@@ -606,10 +636,9 @@ export default class VideoPlayer {
 				this.videoDuration = await getVideoDuration(theUrl) * 1000;
 		}
 
-		if (this.UIvideoPlayerGroup.actor) {
-			
-			this.videoInstance = this.UIvideoPlayerGroup.actor.startVideoStream(this.videoStream.id, options);
-			this.UIvideoPlayerGroup.hide()
+		if (this.UIvideoPlayer.actor) {	
+			this.videoInstance = this.UIvideoPlayer.actor.startVideoStream(this.videoStream.id, options);
+			this.UIvideoPlayer.hide()
 		}
 
 		if (this.isLiveStream) {
@@ -623,7 +652,7 @@ export default class VideoPlayer {
 		this.UIactiveInfo.hide();
 		this.isVideoPlaying = true; 
 		this.currentTime = 0;
-		this.changePlayPauseButtonState();
+		this.togglePlayPauseButtonState();
 
 	}
 
@@ -634,7 +663,7 @@ export default class VideoPlayer {
 				this.isVideoPlaying = true;
 			
 				this.videoInstance.resume();
-				this.changePlayPauseButtonState();
+				this.togglePlayPauseButtonState();
 			}
 		}
 
@@ -648,7 +677,7 @@ export default class VideoPlayer {
 
 			this.videoInstance.stop();
 			this.videoInstance = null;
-			this.UIvideoPlayerGroup.show();
+			this.UIvideoPlayer.show();
 		
 			this.showLabel("ClickText");
 			this.setInitialPlayPauseButtonState();
@@ -665,7 +694,7 @@ export default class VideoPlayer {
 				this.isVideoPlaying = false;
 
 				this.videoInstance.pause();
-				this.changePlayPauseButtonState();
+				this.togglePlayPauseButtonState();
 			}
 		}
 
@@ -716,10 +745,10 @@ export default class VideoPlayer {
 
 		pauseBtn.hide();
 		pauseBtn.disableCollider();
-
+		
 	}
 
-	private changePlayPauseButtonState() {
+	private togglePlayPauseButtonState() {
 
 		let playBtn = this.UIadminControlsGroup.getIconByName('playBtn');
 		let pauseBtn = this.UIadminControlsGroup.getIconByName('pauseBtn');

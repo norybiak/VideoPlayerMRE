@@ -119,9 +119,11 @@ export abstract class Actor {
         let mask = (options.mask !== undefined) ? options.mask : true;
         let enabled = (options.enabled !== undefined) ? options.enabled : mask;
         let parentId = (options.parentId !== undefined) ? options.parentId : MRE.ZeroGuid;
+        let actor = (options.actor !== undefined) ? options.actor : {};
 
         let appearanceLike: Partial<MRE.AppearanceLike> = {
-            enabled
+            enabled,
+            ...((actor.appearance !== undefined) && actor.appearance)
         }
 
         let transformLike: Partial<MRE.ActorTransformLike> = {
@@ -129,7 +131,8 @@ export abstract class Actor {
                 position,
                 rotation,
                 scale
-            }
+            },
+            ...((actor.transform !== undefined) && actor.transform)
         }
 
         return {
@@ -137,7 +140,7 @@ export abstract class Actor {
             parentId: parentId,
             appearance: appearanceLike,
             transform: transformLike,
-            ...options.actor
+            ...actor
         };
 
     }
