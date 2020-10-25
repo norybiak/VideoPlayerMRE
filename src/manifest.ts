@@ -22,7 +22,9 @@ export default class Manifest {
 	public get currentPlaylist() { return this._getCurrentPlaylist(); };
 	public ready: Promise<void>;
    
-    public get data() { return this._data; };
+	public get data() { return this._data; };
+	
+	private manifestPath: string;
 
 	private _data: ManifestData = {
 		currentPlaylist: 0, 
@@ -37,6 +39,8 @@ export default class Manifest {
 	constructor(eventId: string, sessionId: string) {
 
 		this._db = new Database(eventId, sessionId);
+
+		this.manifestPath = encodeURIComponent(`${this._db.sessionId}_manifest.json`);
 		
 		this.ready = new Promise(async (resolve, reject) => {
 			await this._getOrCreate();
@@ -67,13 +71,12 @@ export default class Manifest {
 
     private async _getOrCreate() {
 
-		if (await this._db.checkFileExists(`${this._db.sessionId}_manifest.json`)) {
-			let data = await this._db.readFile(`${this._db.sessionId}_manifest.json`);
+		if (await this._db.checkFileExists(this.manifestPath)) {
+			let data = await this._db.readFile(this.manifestPath);
 			this._data = JSON.parse(data);
 			this._verify();
 		} else {
 			this._data.sessionId = this._db.sessionId;
-			this._db.createDirectory(this._db.sessionId);
 			this._save();
 		}
 
@@ -97,7 +100,7 @@ export default class Manifest {
 	private _save() {
 
         this._verify();
-        this._db.createOrUpdateFile(`${this._db.sessionId}_manifest.json`, JSON.stringify(this._data, null, '\t'));
+        this._db.createOrUpdateFile(this.manifestPath, JSON.stringify(this._data, null, '\t'));
         
 	}
 
