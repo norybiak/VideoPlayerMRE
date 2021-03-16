@@ -118,7 +118,7 @@ export abstract class Actor {
         let scale = (options.scale !== undefined) ? options.scale : { x: 1, y: 1, z: 1 };
         let mask = (options.mask !== undefined) ? options.mask : true;
         let enabled = (options.enabled !== undefined) ? options.enabled : mask;
-        let parentId = (options.parentId !== undefined) ? options.parentId : MRE.ZeroGuid;
+        let parentId = (options.parentId !== undefined) ? options.parentId : undefined;
         let actor = (options.actor !== undefined) ? options.actor : {};
 
         let appearanceLike: Partial<MRE.AppearanceLike> = {

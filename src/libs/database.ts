@@ -12,7 +12,7 @@ export default class Database {
     constructor(public eventId: string, public sessionId: string) {
 
         const path = process.env.DB_PATH || '/videoplayer/';
-        this._baseDir = normalize(posix.join(path, this.eventId));
+        this._baseDir = normalize(posix.join(path, this.eventId, encodeURIComponent(sessionId)));
         this.createIfBaseDirNotExists();
 
     }
@@ -73,7 +73,7 @@ export default class Database {
 
     private _createDir(thePath: string) {
 
-        return new Promise((resolve) => {
+        return new Promise<void>((resolve) => {
             fs.mkdir(thePath, {recursive: true}, (err) => {
                 if (err) throw err;
                 resolve();
