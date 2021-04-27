@@ -7,3 +7,4 @@ built/
 .package-lock
 .deployment
 *.blend1
+.idea/

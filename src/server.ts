@@ -1,5 +1,5 @@
-import { log, WebHost, Permissions } from '@microsoft/mixed-reality-extension-sdk';
-import { resolve as resolvePath } from 'path';
+import {log, Permissions, WebHost} from '@microsoft/mixed-reality-extension-sdk';
+import {resolve as resolvePath} from 'path';
 import VideoPlayer from './app';
 
 log.enable('app');
@@ -12,7 +12,9 @@ process.on('unhandledRejection', (reason) => console.log('unhandledRejection', r
  // Note that process.env.BASE_URL/PORT variables will automatically be used if defined in the .env file
 const server = new WebHost({
    baseDir: resolvePath(__dirname, '../public'),
-   optionalPermissions: [Permissions.UserInteraction]
+   optionalPermissions: [Permissions.UserInteraction],
+   baseUrl: 'http://108.72.45.167:3901',
+   port: 3901,
 });
 
 // Handle new application sessions
