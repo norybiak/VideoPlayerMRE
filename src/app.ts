@@ -1,4 +1,7 @@
 import * as MRE from "@microsoft/mixed-reality-extension-sdk";
+import {GroupMask} from "@microsoft/mixed-reality-extension-sdk";
+
+const GROUP_ADMIN = 'lucky-admin';
 
 /** Defines an animation control field */
 interface ControlDefinition {
@@ -11,64 +14,81 @@ interface ControlDefinition {
 	/** The actor who's text needs to be updated */
 	labelActor?: MRE.Actor;
 }
+interface UserMediaInstance {
+	user: MRE.User,
+	mediaInstance: MRE.MediaInstance,
+}
 
-export default class VideoPlayer {
+export default class LiveStreamVideoPlayer {
 
+	private userMediaInstanceMap: Record<string, UserMediaInstance>;
 	private assets: MRE.AssetContainer;
-	private videos: MRE.AssetContainer;
 	private root: MRE.Actor;
-	private parentActor: MRE.Actor;
 	private videoStreams: MRE.VideoStream[];
-	private currentInstance: MRE.MediaInstance;
 	private currentStream = 0;
 	private isPlaying = true;
 	private volume = 1.0;
 	private looping = true;
 	private spread = 0.0;
 	private rolloffStartDistance = 30;
-	private UIReady: Promise<void>;
+	readonly groupMask: MRE.GroupMask;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
-		this.videos = new MRE.AssetContainer(context);
 		this.assets = new MRE.AssetContainer(context);
-		console.log("App constructed")
+		this.groupMask = new GroupMask(context, [GROUP_ADMIN]);
+
+		console.log("App constructed:", context.sessionId);
 		this.context.onStarted(async () => {
-			console.log("App started");
-			this.UIReady = this.init();
+			console.log("App started:", context.sessionId);
+			this.userMediaInstanceMap = {};
+			const videoStream1 = this.assets.createVideoStream(
+				'stream1',
+				{
+					uri: 'http://108.72.45.167:8080/tmp_hls/stream/index.m3u8'
+				}
+			);
+
+			this.videoStreams = [videoStream1];
+			this.root = MRE.Actor.Create(this.context, {actor: {name: 'Root'}});
+			this.showControls();
 		});
 
-		this.context.onUserJoined((user) => this.handleUser(user));
+		this.context.onUserJoined((user) => this.handleUserJoined(user));
+		this.context.onUserLeft((user: MRE.User) => this.handleUserLeft(user));
 		this.context.onStopped(() => {
-			if (this.currentInstance) {
-				this.currentInstance.stop();
-				this.isPlaying = false;
-				this.currentInstance = null;
-			}
-			console.log("App stopped");
+			Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.stop());
+			this.userMediaInstanceMap = {};
+			console.log("App stopped", context.sessionId);
 		})
 	}
 
-	private async handleUser(user: MRE.User) {
+	private async handleUserJoined(user: MRE.User) {
+		console.log("User Joined:", user.id, user.name);
+		await this.init(user);
 		if (this.checkUserRole(user, 'moderator')) {
-			await this.UIReady;
-			this.showControls(user);
+			user.groups.add(GROUP_ADMIN);
 		}
 	}
 
-	private showControls(user?: MRE.User) {
+	private handleUserLeft(user: MRE.User) {
+		console.log("User Left:", user.id, user.name);
+		const userMediaInstance = this.userMediaInstanceMap[user.id.toString()];
+		if (userMediaInstance) {
+			userMediaInstance?.mediaInstance.stop();
+			delete this.userMediaInstanceMap[user.id.toString()];
+		}
+	}
+
+	private showControls() {
 		const controls: ControlDefinition[] = [
 			{
 				label: "Playing", realtime: true, action: incr => {
 					if (incr !== 0) {
 						if (!this.isPlaying) {
-							if (!this.currentInstance) {
-								this.CreateStreamInstance();
-							}
-							this.currentInstance.resume();
+							Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.resume());
 							this.isPlaying = true;
 						} else {
-							this.currentInstance.stop();
-							this.currentInstance = null;
+							Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.pause());
 							this.isPlaying = false;
 						}
 					}
@@ -82,7 +102,7 @@ export default class VideoPlayer {
 					} else if (incr < 0) {
 						this.volume = this.volume <= 0.0 ? 0.0 : this.volume - .1;
 					}
-					this.currentInstance.setState({volume: this.volume});
+					Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.setState({volume: this.volume}));
 					return Math.floor(this.volume * 100) + "%";
 				}
 			},
@@ -93,7 +113,7 @@ export default class VideoPlayer {
 					} else if (incr < 0) {
 						this.spread = this.spread <= 0.0 ? 0.0 : this.spread - .1;
 					}
-					this.currentInstance.setState({spread: this.spread});
+					Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.setState({spread: this.spread}));
 					return Math.floor(this.spread * 100) + "%";
 				}
 			},
@@ -104,16 +124,16 @@ export default class VideoPlayer {
 					} else if (incr < 0) {
 						this.rolloffStartDistance -= 1;
 					}
-					this.currentInstance.setState({rolloffStartDistance: this.rolloffStartDistance});
+					Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.setState({rolloffStartDistance: this.rolloffStartDistance}));
 					return this.rolloffStartDistance.toString() + 'm';
 				}
 			},
 		];
-
 		this.createControls(controls, MRE.Actor.Create(this.context, {
 			actor: {
-				exclusiveToUser: user.id,
+				appearance: { enabled: this.groupMask },
 				name: 'controlsParent',
+				grabbable: true,
 				parentId: this.root.id,
 				transform: {local: {position: { x: 1.2, y: -0.375, z: -0.05 }}}
 			}
@@ -121,10 +141,13 @@ export default class VideoPlayer {
 
 	}
 
-	private async init() {
-		this.root = MRE.Actor.Create(this.context, {actor: {name: 'Root'}});
-		this.parentActor = MRE.Actor.Create(this.context, {
+	private async init(user: MRE.User) {
+		const groupMask = new GroupMask(this.context, [user.id.toString()]);
+		user.groups.add(user.id.toString());
+		const videoActor = MRE.Actor.Create(this.context, {
 			actor: {
+				exclusiveToUser: user.id,
+				appearance: { enabled: groupMask },
 				parentId: this.root.id,
 				name: 'video',
 				transform: {
@@ -135,23 +158,9 @@ export default class VideoPlayer {
 				},
 			}
 		});
+		await Promise.all([videoActor.created()]);
 
-		const videoStream1 = this.assets.createVideoStream(
-			'stream1',
-			{
-				uri: 'http://108.72.45.167:8080/tmp_hls/stream/index.m3u8'
-//				uri: `youtube://5yx6BWlEVcY`
-			}
-		);
-
-		//Todo: More video sources and types for when support is patched in.
-		// Non youtube?
-
-		this.videoStreams = [videoStream1];
-
-		await Promise.all([this.parentActor.created()]);
-
-		this.CreateStreamInstance();
+		this.CreateStreamInstance(videoActor, user);
 	}
 
 	private createControls(controls: ControlDefinition[], parent: MRE.Actor) {
@@ -173,6 +182,7 @@ export default class VideoPlayer {
 					actor: {
 						name: `${controlDef.label}-label`,
 						parentId: parent.id,
+						appearance: { enabled: this.groupMask },
 						text: {
 							contents: `${controlDef.label}: ${controlDef.action(0)}`,
 							height: 0.0325,
@@ -194,7 +204,7 @@ export default class VideoPlayer {
 					actor: {
 						name: `${controlDef.label}-less`,
 						parentId: parent.id,
-						appearance: {meshId: arrowMesh.id},
+						appearance: {meshId: arrowMesh.id, enabled: this.groupMask },
 						collider: {geometry: {shape: MRE.ColliderType.Auto}},
 						transform: {local: {
 							rotation: MRE.Quaternion.FromEulerAngles(0, 0, Math.PI * 1.5),
@@ -214,7 +224,7 @@ export default class VideoPlayer {
 					actor: {
 						name: `${controlDef.label}-more`,
 						parentId: parent.id,
-						appearance: {meshId: arrowMesh.id},
+						appearance: { meshId: arrowMesh.id, enabled: this.groupMask },
 						collider: {geometry: {shape: MRE.ColliderType.Auto}},
 						transform: {local: {
 								rotation: MRE.Quaternion.FromEulerAngles(0, 0, Math.PI * 0.5),
@@ -247,19 +257,20 @@ export default class VideoPlayer {
 		layout.applyLayout();
 	}
 
-	private CreateStreamInstance() {
-		if (this.currentInstance) {
-			this.currentInstance.stop();
-			this.currentInstance = null;
+	private CreateStreamInstance(parentActor: MRE.Actor, user: MRE.User) {
+		if (this.userMediaInstanceMap[user.id.toString()]) {
+			this.userMediaInstanceMap[user.id.toString()].mediaInstance.stop();
 		}
-		this.currentInstance = this.parentActor.startVideoStream(this.videoStreams[this.currentStream].id,
+
+		const mediaInstance = parentActor.startVideoStream(this.videoStreams[this.currentStream].id,
 			{
 				volume: this.volume,
 				looping: this.looping,
 				spread: this.spread,
 				rolloffStartDistance: this.rolloffStartDistance
 			});
-
+		console.log("Stream Started:", user.id, user.name);
+		this.userMediaInstanceMap[user.id.toString()] = { user, mediaInstance };
 	}
 
 	private checkUserRole(user: MRE.User, role: string) {
