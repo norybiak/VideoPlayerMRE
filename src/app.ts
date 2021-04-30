@@ -29,8 +29,8 @@ export default class LiveStreamVideoPlayer {
 	private isPlaying = true;
 	private volume = 1.0;
 	private looping = true;
-	private spread = 0.0;
-	private rolloffStartDistance = 30;
+	private spread = 0.1;
+	private rolloffStartDistance = 10;
 	readonly groupMask: MRE.GroupMask;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
@@ -118,7 +118,7 @@ export default class LiveStreamVideoPlayer {
 				}
 			},
 			{
-				label: "Rolloff Distance", action: incr => {
+				label: "Rolloff", action: incr => {
 					if (incr > 0) {
 						this.rolloffStartDistance += 1;
 					} else if (incr < 0) {
@@ -135,19 +135,19 @@ export default class LiveStreamVideoPlayer {
 				name: 'controlsParent',
 				grabbable: true,
 				parentId: this.root.id,
-				transform: {local: {position: { x: 1.2, y: -0.375, z: -0.05 }}}
+				transform: {local: { position: { x: 1.2, y: 1.3, z: -0.05 }}}
 			}
 		}));
 
 	}
 
 	private async init(user: MRE.User) {
-		const groupMask = new GroupMask(this.context, [user.id.toString()]);
-		user.groups.add(user.id.toString());
+		// const groupMask = new GroupMask(this.context, [user.id.toString()]);
+		// user.groups.add(user.id.toString());
 		const videoActor = MRE.Actor.Create(this.context, {
 			actor: {
 				exclusiveToUser: user.id,
-				appearance: { enabled: groupMask },
+				// appearance: { enabled: groupMask },
 				parentId: this.root.id,
 				name: 'video',
 				transform: {
