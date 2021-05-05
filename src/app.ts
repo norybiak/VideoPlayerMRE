@@ -18,7 +18,10 @@ interface UserMediaInstance {
 	user: MRE.User,
 	mediaInstance: MRE.MediaInstance,
 }
-
+const qualifiedPlayers = [
+	'yxDuke-red',
+	'yxDuke-blue',
+]
 export default class LiveStreamVideoPlayer {
 
 	private userMediaInstanceMap: Record<string, UserMediaInstance>;
@@ -39,6 +42,10 @@ export default class LiveStreamVideoPlayer {
 
 		console.log("App constructed:", context.sessionId);
 		this.context.onStarted(async () => {
+			if (!qualifiedPlayers.includes(context.sessionId)) {
+				console.log("Rejected unknown player", context.sessionId);
+				return;
+			}
 			console.log("App started:", context.sessionId);
 			this.userMediaInstanceMap = {};
 			const videoStream1 = this.assets.createVideoStream(
@@ -150,6 +157,7 @@ export default class LiveStreamVideoPlayer {
 				// appearance: { enabled: groupMask },
 				parentId: this.root.id,
 				name: 'video',
+				light: { type: 'spot', intensity: 500, range: 100, enabled: true, spotAngle: 180 }, // Add a light component.
 				transform: {
 					local: {
 						position: {x: 0, y: 0, z: 0},
