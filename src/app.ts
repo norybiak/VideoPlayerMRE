@@ -39,13 +39,10 @@ export default class LiveStreamVideoPlayer {
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
 		this.assets = new MRE.AssetContainer(context);
 		this.groupMask = new GroupMask(context, [GROUP_ADMIN]);
-
 		console.log("App constructed:", context.sessionId);
+		if (!this.isClientValid()) { return; }
 		this.context.onStarted(async () => {
-			if (!qualifiedPlayers.includes(context.sessionId)) {
-				console.log("Rejected unknown player", context.sessionId);
-				return;
-			}
+			if (!this.isClientValid()) { return; }
 			console.log("App started:", context.sessionId);
 			this.userMediaInstanceMap = {};
 			const videoStream1 = this.assets.createVideoStream(
@@ -69,7 +66,16 @@ export default class LiveStreamVideoPlayer {
 		})
 	}
 
+	private isClientValid() {
+		if (!qualifiedPlayers.includes(this.context.sessionId)) {
+			console.log("Rejected unknown player", this.context.sessionId);
+			return false;
+		}
+		return true;
+	}
+
 	private async handleUserJoined(user: MRE.User) {
+		if (!this.isClientValid()) { return; }
 		console.log("User Joined:", user.id, user.name);
 		await this.init(user);
 		if (this.checkUserRole(user, 'moderator')) {
@@ -78,6 +84,7 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private handleUserLeft(user: MRE.User) {
+		if (!this.isClientValid()) { return; }
 		console.log("User Left:", user.id, user.name);
 		const userMediaInstance = this.userMediaInstanceMap[user.id.toString()];
 		if (userMediaInstance) {
@@ -157,7 +164,7 @@ export default class LiveStreamVideoPlayer {
 				// appearance: { enabled: groupMask },
 				parentId: this.root.id,
 				name: 'video',
-				light: { type: 'spot', intensity: 500, range: 100, enabled: true, spotAngle: 180 }, // Add a light component.
+				light: { type: 'point', intensity: 1, range: 60, enabled: true, spotAngle: 180, color: MRE.Color3.White() }, // Add a light component.
 				transform: {
 					local: {
 						position: {x: 0, y: 0, z: 0},
