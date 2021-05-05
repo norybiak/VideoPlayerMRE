@@ -27,10 +27,10 @@ export default class LiveStreamVideoPlayer {
 	private videoStreams: MRE.VideoStream[];
 	private currentStream = 0;
 	private isPlaying = true;
-	private volume = 1.0;
+	private volume = 0.7;
 	private looping = true;
 	private spread = 0.1;
-	private rolloffStartDistance = 10;
+	private rolloffStartDistance = 24;
 	readonly groupMask: MRE.GroupMask;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
@@ -153,7 +153,8 @@ export default class LiveStreamVideoPlayer {
 				transform: {
 					local: {
 						position: {x: 0, y: 0, z: 0},
-						scale: {x: 2, y: 2, z: 2}
+						scale: {x: 2, y: 2, z: 2},
+
 					}
 				},
 			}
