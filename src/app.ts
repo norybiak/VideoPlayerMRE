@@ -67,11 +67,16 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private isClientValid() {
+		for(const player of qualifiedPlayers) {
+			if (this.context.sessionId.indexOf(player) !== -1) {
+				return true;
+			}
+		}
 		if (!qualifiedPlayers.includes(this.context.sessionId)) {
 			console.log("Rejected unknown player", this.context.sessionId);
 			return false;
 		}
-		return true;
+		return false;
 	}
 
 	private async handleUserJoined(user: MRE.User) {
@@ -156,20 +161,17 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private async init(user: MRE.User) {
-		// const groupMask = new GroupMask(this.context, [user.id.toString()]);
-		// user.groups.add(user.id.toString());
 		const videoActor = MRE.Actor.Create(this.context, {
 			actor: {
 				exclusiveToUser: user.id,
 				// appearance: { enabled: groupMask },
 				parentId: this.root.id,
 				name: 'video',
-				light: { type: 'point', intensity: 1, range: 60, enabled: true, spotAngle: 180, color: MRE.Color3.White() }, // Add a light component.
+				// light: { type: 'point', intensity: 2.5, range: 50, enabled: true, spotAngle: 180, color: MRE.Color3.White() }, // Add a light component.
 				transform: {
 					local: {
 						position: {x: 0, y: 0, z: 0},
 						scale: {x: 2, y: 2, z: 2},
-
 					}
 				},
 			}
