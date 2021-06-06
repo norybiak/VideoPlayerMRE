@@ -48,12 +48,15 @@ export default class LiveStreamVideoPlayer {
 			const videoStream1 = this.assets.createVideoStream(
 				'stream1',
 				{
-					uri: 'http://108.72.45.167:8080/tmp_hls/stream/index.m3u8'
+					// uri: 'http://108.72.45.167:8080/tmp_dash/stream/index.mpd',
+					uri: 'http://108.72.45.167:8080/tmp_hls/stream/index.m3u8',
+					// uri: 'http://service-stitcher.clusters.pluto.tv/stitch/hls/channel/569546031a619b8f07ce6e25/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=2aaaf380-c2a0-11eb-b95a-9564040e8ac6&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=2a276526-cf0b-433e-b553-654032d0c7a8&userId=&serverSideAds=true&yyy=index.m3u8',
+					duration: 0,
 				}
 			);
 
 			this.videoStreams = [videoStream1];
-			this.root = MRE.Actor.Create(this.context, {actor: {name: 'Root'}});
+			this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
 			this.showControls();
 		});
 
@@ -151,7 +154,7 @@ export default class LiveStreamVideoPlayer {
 		this.createControls(controls, MRE.Actor.Create(this.context, {
 			actor: {
 				appearance: { enabled: this.groupMask },
-				name: 'controlsParent',
+				name: 'bigscreen-controlsParent',
 				grabbable: true,
 				parentId: this.root.id,
 				transform: {local: { position: { x: 1.2, y: 1.3, z: -0.05 }}}
@@ -166,7 +169,7 @@ export default class LiveStreamVideoPlayer {
 				exclusiveToUser: user.id,
 				// appearance: { enabled: groupMask },
 				parentId: this.root.id,
-				name: 'video',
+				name: `big-screen-video-${user.id.toString()}`,
 				// light: { type: 'point', intensity: 2.5, range: 50, enabled: true, spotAngle: 180, color: MRE.Color3.White() }, // Add a light component.
 				transform: {
 					local: {
@@ -198,7 +201,7 @@ export default class LiveStreamVideoPlayer {
 				height: ch,
 				contents: label = MRE.Actor.Create(this.context, {
 					actor: {
-						name: `${controlDef.label}-label`,
+						name: `bigscreen-${controlDef.label}-label`,
 						parentId: parent.id,
 						appearance: { enabled: this.groupMask },
 						text: {
@@ -220,7 +223,7 @@ export default class LiveStreamVideoPlayer {
 				height: ch,
 				contents: less = MRE.Actor.Create(this.context, {
 					actor: {
-						name: `${controlDef.label}-less`,
+						name: `bigscreen-${controlDef.label}-less`,
 						parentId: parent.id,
 						appearance: {meshId: arrowMesh.id, enabled: this.groupMask },
 						collider: {geometry: {shape: MRE.ColliderType.Auto}},
@@ -240,7 +243,7 @@ export default class LiveStreamVideoPlayer {
 				height: ch,
 				contents: more = MRE.Actor.Create(this.context, {
 					actor: {
-						name: `${controlDef.label}-more`,
+						name: `bigscreen-${controlDef.label}-more`,
 						parentId: parent.id,
 						appearance: { meshId: arrowMesh.id, enabled: this.groupMask },
 						collider: {geometry: {shape: MRE.ColliderType.Auto}},

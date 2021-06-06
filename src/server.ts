@@ -3,7 +3,7 @@ import {resolve as resolvePath} from 'path';
 import LiveStreamVideoPlayer from './app';
 
 log.enable('app');
-//log.enable('network');
+// log.enable('network');
 
 process.on('uncaughtException', (err) => console.log('uncaughtException', err));
 process.on('unhandledRejection', (reason) => console.log('unhandledRejection', reason));
