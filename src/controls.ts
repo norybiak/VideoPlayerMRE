@@ -131,8 +131,8 @@ const createControls = (parent: MRE.Actor, controls: ControlDefinition[], userMe
 		controlDef.less = less;
 		controlDef.more = more;
 		if (controlDef.toggle) {
-			more.appearance.enabled = true;
-			less.appearance.enabled = false;
+			more.appearance.enabled = false;
+			less.appearance.enabled = true;
 		}
 		i++;
 	}
@@ -145,8 +145,8 @@ const attachControls = (controls: ControlDefinition[]) => {
 		less.setBehavior(MRE.ButtonBehavior).onClick(() => {
 			label.text.contents = `${controlDef.label}:${controlDef.action(-1)}`;
 			if (controlDef.toggle) {
-				more.appearance.enabled = true;
-				less.appearance.enabled = false;
+				more.appearance.enabled = false;
+				less.appearance.enabled = true;
 			}
 			// for (const rt of this.realtimeLabels) {
 			// 	rt.labelActor.text.contents = `${rt.label}: ${rt.action(0)}`;
@@ -155,8 +155,8 @@ const attachControls = (controls: ControlDefinition[]) => {
 		more.setBehavior(MRE.ButtonBehavior).onClick(() => {
 			label.text.contents = `${controlDef.label}:${controlDef.action(1)}`;
 			if (controlDef.toggle) {
-				more.appearance.enabled = false;
-				less.appearance.enabled = true;
+				more.appearance.enabled = true;
+				less.appearance.enabled = false;
 			}
 			// for (const rt of this.realtimeLabels) {
 			// 	rt.labelActor.text.contents = `${rt.label}: ${rt.action(0)}`;
@@ -232,11 +232,11 @@ export const showControls = (userMediaSession: UserMediaState) => {
 		{
 			toggle: true,
 			label: "MUTE", action: incr => {
-				if (incr > 0) {
+				if (incr < 0) {
 					soundOptions.muted = true;
 					soundOptions.lastVolume = soundOptions.volume;
 					soundOptions.volume = 0;
-				} else if (incr < 0) {
+				} else if (incr > 0) {
 					soundOptions.muted = false;
 					soundOptions.lastVolume = undefined;
 					soundOptions.volume = soundOptions.lastVolume || 0.7;
