@@ -1,6 +1,9 @@
 import * as MRE from "@microsoft/mixed-reality-extension-sdk";
 import {GroupMask} from "@microsoft/mixed-reality-extension-sdk";
 
+const whitelist = [
+	'The Duke', 'J@mRock_Girl'
+];
 const GROUP_ADMIN = 'lucky-admin';
 
 /** Defines an animation control field */
@@ -34,16 +37,17 @@ export default class LiveStreamVideoPlayer {
 	private looping = true;
 	private spread = 0.1;
 	private rolloffStartDistance = 24;
+	private modeNoNewJoins = false;
 	readonly groupMask: MRE.GroupMask;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
 		this.assets = new MRE.AssetContainer(context);
 		this.groupMask = new GroupMask(context, [GROUP_ADMIN]);
-		console.log("App constructed:", context.sessionId);
+		console.log(new Date(), "App constructed:", context.sessionId);
 		if (!this.isClientValid()) { return; }
 		this.context.onStarted(async () => {
 			if (!this.isClientValid()) { return; }
-			console.log("App started:", context.sessionId);
+			console.log(new Date(), "App started:", context.sessionId);
 			this.userMediaInstanceMap = {};
 			const videoStream1 = this.assets.createVideoStream(
 				'stream1',
@@ -65,7 +69,7 @@ export default class LiveStreamVideoPlayer {
 		this.context.onStopped(() => {
 			Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.stop());
 			this.userMediaInstanceMap = {};
-			console.log("App stopped", context.sessionId);
+			console.log(new Date(), "App stopped", context.sessionId);
 		})
 	}
 
@@ -76,7 +80,7 @@ export default class LiveStreamVideoPlayer {
 			}
 		}
 		if (!qualifiedPlayers.includes(this.context.sessionId)) {
-			console.log("Rejected unknown player", this.context.sessionId);
+			console.log(new Date(), "Rejected unknown player", this.context.sessionId);
 			return false;
 		}
 		return false;
@@ -84,16 +88,18 @@ export default class LiveStreamVideoPlayer {
 
 	private async handleUserJoined(user: MRE.User) {
 		if (!this.isClientValid()) { return; }
-		console.log("User Joined:", user.id, user.name);
-		await this.init(user);
-		if (this.checkUserRole(user, 'moderator')) {
-			user.groups.add(GROUP_ADMIN);
+		console.log(new Date(), "User Joined:", user.id, user.name);
+		if (!this.canViewPlayer(user, 'moderator')) {
+			this.modeNoNewJoins = true;
+			console.log(new Date(), `User ${user.name} blocked`);
+			return;
 		}
+		await this.init(user);
 	}
 
 	private handleUserLeft(user: MRE.User) {
 		if (!this.isClientValid()) { return; }
-		console.log("User Left:", user.id, user.name);
+		console.log(new Date(), "User Left:", user.id, user.name);
 		const userMediaInstance = this.userMediaInstanceMap[user.id.toString()];
 		if (userMediaInstance) {
 			userMediaInstance?.mediaInstance.stop();
@@ -290,12 +296,21 @@ export default class LiveStreamVideoPlayer {
 				spread: this.spread,
 				rolloffStartDistance: this.rolloffStartDistance
 			});
-		console.log("Stream Started:", user.id, user.name);
+		console.log(new Date(), "Stream Started:", user.id, user.name);
 		this.userMediaInstanceMap[user.id.toString()] = { user, mediaInstance };
 	}
 
-	private checkUserRole(user: MRE.User, role: string) {
-		 return (user.properties['altspacevr-roles'] === role ||
+	private canViewPlayer(user: MRE.User, role: string) {
+		 const moderator =  (user.properties['altspacevr-roles'] === role ||
 			user.properties['altspacevr-roles'].includes(role));
+
+		 if (this.modeNoNewJoins) {
+		 	return whitelist.includes(user.name);
+		 }
+		 if (moderator) {
+		 	console.log(new Date(), `Detected moderator: ${user.name}`, user.properties);
+		 	return whitelist.includes(user.name) ;
+		 }
+		 return true;
 	}
 }
