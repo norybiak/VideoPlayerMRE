@@ -39,7 +39,7 @@ export interface ControlDefinition {
 const createControls = (parent: MRE.Actor, controls: ControlDefinition[], userMediaSession: UserMediaState) => {
 	const { assets, user: { context, id } } = userMediaSession;
 	const arrowMesh = assets.createCylinderMesh('arrow', 0.005, 0.08, 'z', 3);
-	const material = assets.createMaterial("mat", { color: MRE.Color3.Green() });
+	const material = assets.createMaterial("mat", { color: MRE.Color3.Red() });
 
 	const layout = new MRE.PlanarGridLayout(parent);
 	const cw = 0.08, ch = 0.1;
@@ -66,7 +66,7 @@ const createControls = (parent: MRE.Actor, controls: ControlDefinition[], userMe
 						font: TextFontFamily.Monospace,
 						anchor: MRE.TextAnchorLocation.MiddleRight,
 						justify: MRE.TextJustify.Right,
-						color: MRE.Color3.Green(),
+						color: MRE.Color3.Red(),
 					}
 				}
 			})
@@ -145,8 +145,8 @@ const attachControls = (controls: ControlDefinition[]) => {
 		less.setBehavior(MRE.ButtonBehavior).onClick(() => {
 			label.text.contents = `${controlDef.label}:${controlDef.action(-1)}`;
 			if (controlDef.toggle) {
-				more.appearance.enabled = false;
-				less.appearance.enabled = true;
+				more.appearance.enabled = true;
+				less.appearance.enabled = false;
 			}
 			// for (const rt of this.realtimeLabels) {
 			// 	rt.labelActor.text.contents = `${rt.label}: ${rt.action(0)}`;
@@ -155,8 +155,8 @@ const attachControls = (controls: ControlDefinition[]) => {
 		more.setBehavior(MRE.ButtonBehavior).onClick(() => {
 			label.text.contents = `${controlDef.label}:${controlDef.action(1)}`;
 			if (controlDef.toggle) {
-				more.appearance.enabled = true;
-				less.appearance.enabled = false;
+				more.appearance.enabled = false;
+				less.appearance.enabled = true;
 			}
 			// for (const rt of this.realtimeLabels) {
 			// 	rt.labelActor.text.contents = `${rt.label}: ${rt.action(0)}`;
@@ -226,20 +226,21 @@ export const showControls = (userMediaSession: UserMediaState) => {
 				}
 				mediaInstance?.setState({ volume: soundOptions.volume });
 				const val = soundOptions.volume * 100;
-				return Math.round(val) + "%";
+				const newVal = Math.round(val);
+				return `${newVal < 10 ? '0': ''}`+ newVal + "%";
 			}
 		},
 		{
 			toggle: true,
 			label: "MUTE", action: incr => {
-				if (incr < 0) {
+				if (incr > 0) {
+					soundOptions.muted = false;
+					soundOptions.volume = soundOptions.lastVolume || 0.7;
+					soundOptions.lastVolume = undefined;
+				} else if (incr < 0) {
 					soundOptions.muted = true;
 					soundOptions.lastVolume = soundOptions.volume;
 					soundOptions.volume = 0;
-				} else if (incr > 0) {
-					soundOptions.muted = false;
-					soundOptions.lastVolume = undefined;
-					soundOptions.volume = soundOptions.lastVolume || 0.7;
 				}
 				mediaInstance?.setState({ volume: soundOptions.volume });
 				return soundOptions.muted ? 'ON' : 'OFF';
