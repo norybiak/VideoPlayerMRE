@@ -12,6 +12,15 @@ export interface UserMediaState {
 	actors: MRE.Actor[];
 }
 
+export interface UserMediaState2 {
+	mediaInstance: MRE.MediaInstance,
+	playing: boolean;
+	soundOptions: CustomSetVideoStateOptions,
+	// user: MRE.User;
+	assets: MRE.AssetContainer;
+	actors: MRE.Actor[];
+}
+
 const headsetDevices = [
 	'oculus',
 	'reverb',

@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@microsoft/gltf-gen": "^0.21.0",
-    "@microsoft/mixed-reality-extension-sdk": "^0.21.0",
+    "@microsoft/mixed-reality-extension-sdk": "^0.20.0",
     "@types/node": "^14.0.13",
     "@types/pg": "^7.14.10",
     "@types/pg-format": "^1.0.1",
