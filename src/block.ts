@@ -1,3 +1,8 @@
+/**
+ *
+ * @param predicate Block until predicate function returns true
+ * @param giveUp
+ */
 export const block = (predicate: () => boolean, giveUp = 5000) => new Promise((resolve, reject) => {
 	const timestamp = Date.now();
 	setInterval(() => {

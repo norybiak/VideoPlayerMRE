@@ -3,6 +3,10 @@ import { ColliderType } from '@microsoft/mixed-reality-extension-sdk';
 import block from './block';
 import { CustomSetVideoStateOptions, showControls, UserMediaState, UserMediaState2 } from './controls';
 
+const delay = (milliseconds: number): Promise<void> => new Promise<void>((resolve) => {
+	setTimeout(() => resolve(), milliseconds);
+});
+
 const whitelist = [
 	'The Duke', 'J@mRock_Girl', 'Artsy!'
 ];
@@ -20,6 +24,7 @@ export default class LiveStreamVideoPlayer {
 	private modeNoNewJoins = false;
 	private attach = false;
 	private appStarted = false;
+	private initializing = false;
 	private videoActor: MRE.Actor;
 
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
@@ -37,7 +42,8 @@ export default class LiveStreamVideoPlayer {
 				'stream1',
 				{
 					// uri: 'http://108.72.45.167:8080/tmp_dash/stream/index.mpd',
-					uri: 'http://108.72.45.167:8080/hls/stream/index.m3u8',
+					// uri: 'http://108.72.45.167:8080/hls/stream/index.m3u8',
+					uri: 'https://3d-sbs-videos.s3.amazonaws.com/Blade+Runner+2049+-+Full+Movie+Online.mp4',
 					// uri: 'http://service-stitcher.clusters.pluto.tv/stitch/hls/channel/569546031a619b8f07ce6e25/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=2aaaf380-c2a0-11eb-b95a-9564040e8ac6&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=2a276526-cf0b-433e-b553-654032d0c7a8&userId=&serverSideAds=true&yyy=index.m3u8',
 					duration: 0,
 				}
@@ -46,7 +52,6 @@ export default class LiveStreamVideoPlayer {
 			this.videoStreams = [videoStream1];
 			this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
 			await this.root.created;
-			await this.init();
 			console.log(new Date(), "App started:", context.sessionId);
 		});
 
@@ -75,7 +80,17 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private async handleUserJoined(user: MRE.User) {
+		if (!this.appStarted && !this.initializing) {
+			this.initializing = true;
+			await this.init();
+			this.CreateStreamInstance(this.videoActor);
+		}
 		await block(() => this.appStarted, 30000);
+		// await delay(1000);
+		// this.userMediaState.mediaInstance.pause();
+		// await delay(1000);
+		// this.userMediaState.mediaInstance.resume();
+		this.userMediaState.mediaInstance.setState({visible: false})
 		if (!this.isClientValid()) { return; }
 		console.log(
 			new Date(),
@@ -92,7 +107,6 @@ export default class LiveStreamVideoPlayer {
 			console.log(new Date(), `User ${user.name} blocked`);
 			return;
 		}
-		this.CreateStreamInstance(this.videoActor);
 
 	}
 
@@ -138,7 +152,7 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private async init() {
-		if (!this.appStarted) {
+		if (!this.appStarted && this.initializing) {
 			const videoActor = this.getVideoActor();
 			await Promise.all([videoActor.created()]);
 			this.videoActor = videoActor;
@@ -146,6 +160,7 @@ export default class LiveStreamVideoPlayer {
 			// 	videoActor.attach(user.id, 'center-eye');
 			// }
 			this.appStarted = true;
+			this.initializing = false;
 		}
 	}
 

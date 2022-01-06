@@ -10,6 +10,7 @@ export interface UserMediaState {
 	user: MRE.User;
 	assets: MRE.AssetContainer;
 	actors: MRE.Actor[];
+	currentStream?: SynchronizedVideoStream;
 }
 
 export interface UserMediaState2 {
@@ -19,6 +20,14 @@ export interface UserMediaState2 {
 	// user: MRE.User;
 	assets: MRE.AssetContainer;
 	actors: MRE.Actor[];
+}
+
+export interface SynchronizedVideoStream {
+	videoStream?: MRE.VideoStream;
+	startTime: number;
+	streamCount: number;
+	duration: string;
+	uri: string;
 }
 
 const headsetDevices = [

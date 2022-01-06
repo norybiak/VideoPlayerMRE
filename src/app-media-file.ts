@@ -1,6 +1,8 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
 import { ColliderType } from '@microsoft/mixed-reality-extension-sdk';
-import { CustomSetVideoStateOptions, showControls, UserMediaState } from './controls';
+import {CustomSetVideoStateOptions, showControls, SynchronizedVideoStream, UserMediaState} from './controls';
+import fetch from 'node-fetch';
+import block from "./block";
 
 const whitelist = [
 	'The Duke', 'Jam Rock Girl',
@@ -13,19 +15,36 @@ const qualifiedPlayers = [
 	'yxDuke-red',
 	'yxDuke-blue',
 ]
-let hostIP = '108.72.45.167';
 const sbsArtifactId = '1902749595545371635';
+
+const hmsToSecondsOnly = (str = '') => {
+	var p = str.split(':'),
+		s = 0, m = 1;
+
+	while (p.length > 0) {
+		s += m * parseInt(p.pop(), 10);
+		m *= 60;
+	}
+
+	return s;
+}
+
+const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
+	const url = "https://3d-sbs-videos.s3.amazonaws.com/3d-sbs-streams.json"; // TODO: config
+	return fetch(url).then(res => res.json())
+}
 
 export default class LiveStreamVideoPlayer {
 
 	private userMediaInstanceMap: Record<string, UserMediaState>;
 	private readonly assets: MRE.AssetContainer;
 	private root: MRE.Actor;
-	private videoStreams: MRE.VideoStream[];
-	private currentStream = 0;
+	private videoStreams: Record<string, SynchronizedVideoStream> = {};
+	private currentStream = 'stream1';
 	private modeNoNewJoins = false;
 	private attach = false;
-    private type = "";
+	private initialized = false;
+    // private type: 'live' | 'file' = "file";
 	private mode: 'normal' | 'sbs' = "normal";
 	constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
 		this.assets = new MRE.AssetContainer(context);
@@ -33,7 +52,6 @@ export default class LiveStreamVideoPlayer {
 		if (params?.attach) {
 			this.attach = true;
 		}
-        this.type = params?.type?.[0];
 		this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
 		console.log('MODE', this.mode);
 		if (!this.isClientValid()) { return; }
@@ -41,32 +59,28 @@ export default class LiveStreamVideoPlayer {
 			if (!this.isClientValid()) { return; }
 			console.log(new Date(), "App started:", context.sessionId);
 			this.userMediaInstanceMap = {};
-			const videoStream1 = this.assets.createVideoStream(
-				'stream1',
-				{
-					// uri: 'http://108.72.45.167:8080/tmp_dash/stream/index.mpd',
-					// uri: `http://108.72.45.167:8080/hls/stream/index.m3u8`,
-					uri: `http://${hostIP}:8080/hls/stream/index.m3u8`,
-					// uri: `http://${hostIP}:8080/dashjs/stream/index.mpd`,
-					// uri: 'http://service-stitcher.clusters.pluto.tv/stitch/hls/channel/569546031a619b8f07ce6e25/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=2aaaf380-c2a0-11eb-b95a-9564040e8ac6&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=2a276526-cf0b-433e-b553-654032d0c7a8&userId=&serverSideAds=true&yyy=index.m3u8',
-					duration: 0,
-				}
-			);
-
-			this.videoStreams = [videoStream1];
-            if (this.type) {
-                const videoStream2 = this.assets.createVideoStream(
-                    'stream2',
-                    {
-                        // uri: 'http://108.72.45.167:8080/tmp_dash/stream/index.mpd',
-                        uri: `http://192.168.2.35:8080/tmp_hls/stream/index.m3u8`,
-                        // uri: 'http://service-stitcher.clusters.pluto.tv/stitch/hls/channel/569546031a619b8f07ce6e25/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=2aaaf380-c2a0-11eb-b95a-9564040e8ac6&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=2a276526-cf0b-433e-b553-654032d0c7a8&userId=&serverSideAds=true&yyy=index.m3u8',
-                        duration: 0,
-                    }
-                );
-                this.videoStreams.push(videoStream2);
-            }
+			// Load data file, and then default stream
+			this.videoStreams = await fetchSyncStreams();
+			console.log("Loaded Video Stream data", this.videoStreams);
+			if (params?.vc || params?.fc) {
+				this.currentStream = params.vc as string || params.fc as string;
+			} else {
+				this.currentStream = Object.keys(this.videoStreams)?.[0];
+			}
+			if (this.currentStream) {
+				const vstream = this.videoStreams[this.currentStream];
+				console.log(new Date(), 'Playing default stream', vstream);
+				vstream.videoStream = this.assets.createVideoStream(
+					this.currentStream,
+					{
+						uri: this.videoStreams[this.currentStream].uri,
+					}
+				);
+			} else {
+				throw Error("Video Stream data not loaded")
+			}
 			this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
+			this.initialized = true;
 		});
 
 		this.context.onUserJoined((user) => this.handleUserJoined(user));
@@ -92,6 +106,7 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private async handleUserJoined(user: MRE.User) {
+		await block(() => this.initialized);
 		if (!this.isClientValid()) { return; }
 		console.log(
 			new Date(),
@@ -117,6 +132,7 @@ export default class LiveStreamVideoPlayer {
 		const userMediaInstance = this.userMediaInstanceMap[user.id.toString()];
 		if (userMediaInstance) {
 			userMediaInstance?.mediaInstance.stop();
+			userMediaInstance?.currentStream?.streamCount > 0 && userMediaInstance.currentStream.streamCount--;
 			userMediaInstance?.actors.forEach(v => v.detach());
 			userMediaInstance?.actors.forEach(v => v.appearance.enabled = false);
 			this.userMediaInstanceMap[user.id.toString()] = undefined;
@@ -125,21 +141,6 @@ export default class LiveStreamVideoPlayer {
 	}
 
 	private async init(user: MRE.User) {
-		let streamId = 0;
-		// switch(this.type) {
-		// 	case 'I':
-		// 		if (internalWhitelist.includes(user.name)) {
-		// 			streamId = 1
-		// 		} else {
-		// 			return;
-		// 		}
-		// 		break;
-		// 	case 'E':
-		// 		if (internalWhitelist.includes(user.name)) {
-		// 			return;
-		// 		}
-		// }
-		console.log("Horace.streamId", streamId);
 		const streamScale = this.mode === 'sbs' ? 1 : 1;
 		const transform = {
 			local: {
@@ -172,28 +173,6 @@ export default class LiveStreamVideoPlayer {
 		}
 		if (this.mode === "sbs") {
 			console.log("Creating SBS", this.mode)
-			// const sbsActorMat = this.assets.createMaterial("mat", { color: MRE.Color3.Red() });
-			// const arrowMesh = this.assets.createBoxMesh("testmessage", 1,1, 1)
-			// const sbsActor = MRE.Actor.Create(this.context, {
-			// 	actor: {
-			// 		name: `test1`,
-			// 		parentId: videoActor.id,
-			// 		exclusiveToUser: user.id,
-			// 		appearance: {
-			// 			meshId: arrowMesh.id,
-			// 			materialId: sbsActorMat.id,
-			// 			// enabled: true,
-			// 			// enabled: this.groupMask
-			// 		},
-			// 		collider: { geometry: { shape: MRE.ColliderType.Auto } },
-			// 				transform: { ...transform,
-			// 					local: { ...transform.local,
-			// 						scale: { ...transform.local.scale },
-			// 						position: { ...transform.local.position, z: -2 },
-			// 					}},
-			// 		// 	}
-			// 	}
-			// })
 			const rotation = MRE.Quaternion.FromEulerAngles(0, -Math.PI, 0);
 			const sbsScale = 0.05620;
 			// const sbsScale = 0.06;
@@ -209,29 +188,47 @@ export default class LiveStreamVideoPlayer {
 					transform: { ...transform,
 						local: { ...transform.local,
 							scale: { z: sbsScale, x: sbsScale, y: sbsScale },
-							position: { x: 0.00095, y: 0, z: 0.04 },
+							position: { x: 0.000, y: 0, z: 0.04 },
 							rotation, //: { y: -100, z: 0, x: 0 }
 						}},
 				}
 			});
 			await sbsActor.created();
 		}
-		this.CreateStreamInstance(videoActor, user, streamId);
+		this.CreateStreamInstance(videoActor, user);
 	}
 
-	private CreateStreamInstance(parentActor: MRE.Actor, user: MRE.User, streamId: number) {
+	private CreateStreamInstance(parentActor: MRE.Actor, user: MRE.User) {
 		if (this.userMediaInstanceMap[user.id.toString()]) {
 			this.userMediaInstanceMap[user.id.toString()].mediaInstance.stop();
 		}
+		const aVideoStream = this.videoStreams[this.currentStream];
+		if (!aVideoStream.videoStream) {
+			aVideoStream.streamCount = 0;
+			aVideoStream.startTime = aVideoStream.startTime && aVideoStream.startTime > 0 ? aVideoStream.startTime : -1;
+			aVideoStream.videoStream = this.assets.createVideoStream(
+				this.currentStream,
+				{
+					uri: aVideoStream.uri,
+				}
+			);
+		}
 		const soundOptions: CustomSetVideoStateOptions = {
 			volume: 0.7,
-			looping: false,
+			looping: true,
 			spread: 0.0,
 			rolloffStartDistance: 24,
 			muted: false,
 		}
-		const mediaInstance = parentActor.startVideoStream(this.videoStreams[streamId].id, soundOptions);
-		console.log(new Date(), "Stream Started:", user.id, user.name);
+		const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
+		if (aVideoStream?.startTime > 0) {
+			soundOptions.time = getRunningTime() % hmsToSecondsOnly(aVideoStream.duration);
+		} else {
+			aVideoStream.startTime = Date.now();
+		}
+		aVideoStream.streamCount++;
+		const mediaInstance = parentActor.startVideoStream(aVideoStream?.videoStream?.id, soundOptions);
+		console.log(new Date(), "Stream Started:", user.id, user.name, this.currentStream);
 		const userMediaState: UserMediaState = {
 			user,
 			mediaInstance,
@@ -239,6 +236,7 @@ export default class LiveStreamVideoPlayer {
 			assets: this.assets,
 			soundOptions,
 			actors: [],
+			currentStream: aVideoStream,
 		}
 		this.userMediaInstanceMap[user.id.toString()] = userMediaState;
 		showControls(userMediaState);
