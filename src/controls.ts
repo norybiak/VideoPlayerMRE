@@ -11,6 +11,8 @@ export interface UserMediaState {
 	assets: MRE.AssetContainer;
 	actors: MRE.Actor[];
 	currentStream?: SynchronizedVideoStream;
+	videoActor?: MRE.Actor;
+	controlActor?: MRE.Actor;
 }
 
 export interface UserMediaState2 {
@@ -309,6 +311,7 @@ export const showControls = (userMediaSession: UserMediaState) => {
 		}
 	});
 	userMediaSession.actors.push(controlActor);
+	userMediaSession.controlActor = controlActor;
 	createControls(controlActor, controls, userMediaSession);
 	attachControls(controls);
 	controlActor.attach(user.id, headsetDetected ? 'left-hand' : 'hips');
