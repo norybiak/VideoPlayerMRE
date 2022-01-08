@@ -40,7 +40,6 @@ type VideoStreamSelection = {
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
     const url = "https://3d-sbs-videos.s3.amazonaws.com/3d-sbs-streams.json"; // TODO: config
     return fetch(url).then(res => res.json()).then(v => {
-        console.log("Horac2", v);
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
             if (v[key]?.enabled) {
@@ -112,9 +111,9 @@ export default class LiveStreamVideoPlayer {
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             const {root: vidStreamsRoot} = this.videoStreamSelections;
             const {position, scale} = vidStreamsRoot.transform.local;
-            const vidStreamScaleFactor = 0.045;
-            position.z = -2;
-            position.y = 0.15;
+            const vidStreamScaleFactor = 0.05;
+            position.z = -2.055;
+            position.y = 0.11;
             scale.x = vidStreamScaleFactor;
             scale.y = vidStreamScaleFactor;
             scale.z = vidStreamScaleFactor;
@@ -131,6 +130,17 @@ export default class LiveStreamVideoPlayer {
             clearTimeout(this.currentStreamTimer);
             console.log(new Date(), "App stopped", context.sessionId);
         })
+    }
+
+    private findUser(userName: string): UserMediaState {
+        if (userName) {
+            for (const aUser of Object.values(this.userMediaInstanceMap)) {
+                if (aUser?.user?.name === userName) {
+                    return aUser;
+                }
+            }
+        }
+        return null;
     }
 
     private isClientValid() {
@@ -391,8 +401,11 @@ export default class LiveStreamVideoPlayer {
                     if (this.currentStream !== syncVideoStream.id) {
                         console.log(this.videoStreams);
                         console.log(new Date(), "Change requested", this.streamCount);
-                        if (this.playing && this.streamCount > 1) {
-                            await user.prompt("Movie changes are not allowed while playing with 2 or more viewers in the theater.");
+                        // console.log("Horace", this.playing, this.streamCount, !user.properties['altspacevr-roles'].includes('moderator'), !!this.findUser('yxduke3'));
+                        if (this.playing
+                            && this.streamCount - (!!this.findUser('BlueAutobot') ? 1 : 0) > 1
+                            && !user.properties['altspacevr-roles'].includes('moderator')) {
+                            await user.prompt("Movie changes are not allowed with 2 or more viewers in the theater.  You may select a new movie after the current movie has ended.");
                             return;
                         }
 

@@ -57,7 +57,6 @@ const createVideoCard = async (
     await delay(220);
     // await photo.created();
     const playButtonMaterial = assetsContainer.createMaterial("mat", { color: MRE.Color3.Red() });
-    console.log("Create2");
     const playButtonBox = assetsContainer.createBoxMesh("box", 0.22, 0.075, 0.0005);
 
     const playButton = MRE.Actor.Create(context,
@@ -132,7 +131,6 @@ const layoutCards = (root: MRE.Actor, videoStreamCards: MRE.Actor[]) => {
 }
 
 const createVideoSelection = async (context: MRE.Context, parent: MRE.Actor, assetsContainer: MRE.AssetContainer, videoStreams: Record<string, SynchronizedVideoStream>) => {
-    console.log("Create1");
         const root = MRE.Actor.Create(context, {
             actor: {
                 name: "VideoSelectionRoot",
@@ -145,14 +143,12 @@ const createVideoSelection = async (context: MRE.Context, parent: MRE.Actor, ass
                 }
             }
         });
-    console.log("Create4");
     const videoStreamCards: MRE.Actor[] = [];
     const videoStreamCardsMapping: Record<string, {
         syncVideoStream: SynchronizedVideoStream,
         videoStreamCard: MRE.Actor,
         playButton: MRE.Actor,
     }> = {};
-    console.log("Create5");
     for(const syncVideoStream of Object.values(videoStreams)) {
         const videoStreamCard = await createVideoCard(context, root, syncVideoStream, assetsContainer);
         videoStreamCards.push(videoStreamCard.base);
@@ -160,10 +156,7 @@ const createVideoSelection = async (context: MRE.Context, parent: MRE.Actor, ass
             syncVideoStream, videoStreamCard: videoStreamCard.base, playButton: videoStreamCard.playButton
         }
     }
-    console.log("Create6");
     layoutCards(root, videoStreamCards);
-    console.log("Create7");
-
     return { root, videoStreamCardsMapping }
 }
 
