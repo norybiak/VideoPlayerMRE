@@ -25,11 +25,14 @@ export interface UserMediaState2 {
 }
 
 export interface SynchronizedVideoStream {
+	id: string;
 	videoStream?: MRE.VideoStream;
 	startTime: number;
 	streamCount: number;
 	duration: string;
 	uri: string;
+	photoArtifactId: string;
+	enabled: boolean;
 }
 
 const headsetDevices = [
