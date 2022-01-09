@@ -19,6 +19,10 @@ const qualifiedPlayers = [
     'yxDuke-blue',
 ]
 const sbsArtifactId = '1902749595545371635';
+const sbsSmArtifactId = '1910479711725682700';
+const sbsMedArtifactId = '1910620162667578077';
+
+const testModeEnabled = true; // TODO: set to false in environment
 
 const hmsToSecondsOnly = (str = '') => {
     var p = str.split(':'),
@@ -36,19 +40,20 @@ type VideoStreamSelection = {
     syncVideoStream: SynchronizedVideoStream,
     videoStreamCard: MRE.Actor,
     playButton: MRE.Actor,
-}
+};
+
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
-    const url = "https://3d-sbs-videos.s3.amazonaws.com/3d-sbs-streams.json"; // TODO: config
+    const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
     return fetch(url).then(res => res.json()).then(v => {
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
-            if (v[key]?.enabled) {
-                newResult[key] = v[key]
+            if (v[key]?.enabled || (testModeEnabled && v[key]?.testMode)) {
+                newResult[key] = v[key];
             }
         }
         return newResult;
     });
-}
+};
 
 export default class LiveStreamVideoPlayer {
 
@@ -63,11 +68,12 @@ export default class LiveStreamVideoPlayer {
     private currentStreamTimer: Timeout;
     private playing = false;
     private streamCount = 0;
+    private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | string  = 'normal'
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
     // private type: 'live' | 'file' = "file";
-    private mode: 'normal' | 'sbs' = "normal";
+    private mode: 'normal' | 'sbs'= "normal";
 
     constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
         this.assets = new MRE.AssetContainer(context);
@@ -75,6 +81,7 @@ export default class LiveStreamVideoPlayer {
         if (params?.attach) {
             this.attach = true;
         }
+        this.sbsSize = params?.sz as string || 'normal';
         this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
         console.log(new Date(), 'MODE', this.mode);
         if (!this.isClientValid()) {
@@ -110,9 +117,21 @@ export default class LiveStreamVideoPlayer {
             await delay(2000);
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             const {root: vidStreamsRoot} = this.videoStreamSelections;
-            const {position, scale} = vidStreamsRoot.transform.local;
-            const vidStreamScaleFactor = 0.05;
-            position.z = -2.055;
+            const {position, scale, rotation } = vidStreamsRoot.transform.local;
+            let vidStreamScaleFactor = 0.05;
+            switch (this.sbsSize) {
+                case 'sm':
+                    position.z = -2.055;
+                    break;
+                case 'med':
+                    position.z = -1.775;
+                    position.x = -0.83;
+                    rotation.y = -90;
+                    vidStreamScaleFactor += 0.07
+                    break;
+                default:
+                    position.z = -2.055;
+            }
             position.y = 0.11;
             scale.x = vidStreamScaleFactor;
             scale.y = vidStreamScaleFactor;
@@ -247,8 +266,20 @@ export default class LiveStreamVideoPlayer {
             const rotation = MRE.Quaternion.FromEulerAngles(0, -Math.PI, 0);
             const sbsScale = 0.05620;
             // const sbsScale = 0.06;
+            let anSbsArtId;
+            switch (this.sbsSize) {
+                case 'sm':
+                    anSbsArtId = sbsSmArtifactId;
+                    break;
+                case 'med':
+                    anSbsArtId = sbsMedArtifactId;
+                    break;
+                default:
+                    anSbsArtId = sbsArtifactId;
+            }
+            console.log("Horace", this.sbsSize, anSbsArtId)
             const sbsActor = MRE.Actor.CreateFromLibrary(this.context, {
-                resourceId: `artifact:${sbsArtifactId}`,
+                resourceId: `artifact:${anSbsArtId}`,
                 actor: {
                     parentId: videoActor.id,
                     name: `test-sbs-${user.id}`,
