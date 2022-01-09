@@ -11,7 +11,7 @@
   "10002":
   {
     "id": "10002",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Blade+Runner+2049+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Blade%20Runner%202049%20-%20Full%20Movie%20Online.mp4",
     "duration": "02:32:52",
     "title": "Blade Runner 2049",
     "photoArtifactId": "1909769064423620897",
@@ -20,7 +20,7 @@
   "10003":
   {
     "id": "10003",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Alita+Battle+Angel+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Alita%20Battle%20Angel%20-%20Full%20Movie%20Online.mp4",
     "duration": "01:56:59",
     "title": "Alita Battle Angel",
     "photoArtifactId": "1909940358993674493",
@@ -29,7 +29,7 @@
   "10004":
   {
     "id": "10004",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Avengers+Endgame+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Avengers%20Endgame%20-%20Full%20Movie%20Online.mp4",
     "duration": "02:49:10",
     "title": "Avengers End Game",
     "photoArtifactId": "1909940576057295224",
@@ -38,7 +38,7 @@
   "10005":
   {
     "id": "10005",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Black+Panther+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Black%20Panther%20-%20Full%20Movie%20Online.mp4",
     "duration": "02:06:47",
     "title": "Black Panther",
     "photoArtifactId": "1909942976952402883",
@@ -47,7 +47,7 @@
   "10006":
   {
     "id": "10006",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Prometheus+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Prometheus%20-%20Full%20Movie%20Online.mp4",
     "duration": "01:58:05",
     "title": "Prometheus",
     "photoArtifactId": "1909943372668207709",
@@ -56,7 +56,7 @@
   "10007":
   {
     "id": "10007",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Rampage+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Rampage%20-%20Full%20Movie%20Online.mp4",
     "duration": "01:41:19",
     "title": "Rampage",
     "photoArtifactId": "1909943716215260002",
@@ -65,7 +65,7 @@
   "10008":
   {
     "id": "10008",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Ready+Player+One+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Ready%20Player%20One%20-%20Full%20Movie%20Online.mp4",
     "duration": "02:09:20",
     "title": "Ready Player One",
     "photoArtifactId": "1909944443675345633",
@@ -74,7 +74,7 @@
   "10009":
   {
     "id": "10009",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Spider-Man+Far+from+Home+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Spider-Man%20Far%20from%20Home%20-%20Full%20Movie%20Online.mp4",
     "duration": "01:59:28",
     "title": "Spider Man: Farm from Home",
     "photoArtifactId": "1909944777399337880",
@@ -83,10 +83,30 @@
   "10010":
   {
     "id": "10010",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Spider-Man+Into+the+Spider-Verse+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Spider-Man%20Into%20the%20Spider-Verse%20-%20Full%20Movie%20Online.mp4",
     "duration": "01:45:24",
     "title": "Spider Man: Into the Spider Verse",
     "photoArtifactId": "1909945186343977591",
     "enabled": true
+  },
+  "10011":
+  {
+    "id": "10011",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Shazam%20-%20Full%20Movie%20Online.mp4",
+    "duration": "02:00:50",
+    "title": "Shazam",
+    "photoArtifactId": "1910547460002939491",
+    "enabled": true,
+    "testMode": false
+  },
+  "10012":
+  {
+    "id": "10012",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Skyscraper%20-%20Full%20Movie%20Online.mp4",
+    "duration": "01:33:00",
+    "title": "Skyscraper",
+    "photoArtifactId": "1910547507851559546",
+    "enabled": true,
+    "testMode": false
   }
 }
