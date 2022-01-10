@@ -7,6 +7,8 @@ import createVideoSelection, {playButtonLabel} from "./video-selection";
 import theme from './theme';
 import delay from "./delay";
 import Timeout = NodeJS.Timeout;
+import {DialogResponse} from "@microsoft/mixed-reality-extension-sdk/built/user/user";
+import {promiseAllTimeout} from "./promiseAllTimeout";
 
 const getButtonLabel =
     (actor: MRE.Actor) => actor.children.find(v => v.name === playButtonLabel);
@@ -55,6 +57,7 @@ const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> =>
     });
 };
 
+const autobot = 'BlueAutobot';
 export default class LiveStreamVideoPlayer {
 
     private userMediaInstanceMap: Record<string, UserMediaState>;
@@ -69,6 +72,7 @@ export default class LiveStreamVideoPlayer {
     private playing = false;
     private streamCount = 0;
     private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | string  = 'normal'
+    private ignoreClicks = false;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -429,14 +433,9 @@ export default class LiveStreamVideoPlayer {
                 // }));
                 buttonBehavior.onClick(async (user, actionData) => {
                     // TODO:  Check to see if video stopped or one player in room
-                    if (this.currentStream !== syncVideoStream.id) {
-                        console.log(this.videoStreams);
-                        console.log(new Date(), "Change requested", this.streamCount);
-                        // console.log("Horace", this.playing, this.streamCount, !user.properties['altspacevr-roles'].includes('moderator'), !!this.findUser('yxduke3'));
-                        if (this.playing
-                            && this.streamCount - (!!this.findUser('BlueAutobot') ? 1 : 0) > 1
-                            && !user.properties['altspacevr-roles'].includes('moderator')) {
-                            await user.prompt("Movie changes are not allowed with 2 or more viewers in the theater.  You may select a new movie after the current movie has ended.");
+                    if (this.currentStream !== syncVideoStream.id  && !this.ignoreClicks) {
+                        const canChangeVideo = await this.handleChangeUserRequest(user, syncVideoStream.id);
+                        if (!canChangeVideo) {
                             return;
                         }
 
@@ -460,4 +459,50 @@ export default class LiveStreamVideoPlayer {
             }
         }
     };
+
+    // If moderator, change movie
+    // Disable clicks after use makes a selection for n seconds
+// Iterate through all current viewers (do not worry recent joiners", add to mapping, and prompt user.  Do not prompt autobot
+// Generate promises, and iterate through the results
+// if any result is false, do not change, prevent user from clicking button again.
+// if yes change movie
+
+    private async handleChangeUserRequest(user: MRE.User, newVidStreamId: string) {
+        if (this.playing
+            && this.streamCount - (!!this.findUser('BlueAutobot') ? 1 : 0) > 1
+            && !user.properties['altspacevr-roles'].includes('moderator')) {
+            const confirmation = await user.prompt("Please wait 15 seconds for the current viewers to approve your movie change request.  Press 'OK' to continue, 'Cancel' to abort.");
+            if (!confirmation?.submitted) return false;
+            const votingResults: Promise<DialogResponse>[]= [];
+            const videoStream = this.videoStreams[newVidStreamId];
+            for(const aUser of this.context.users) {
+                if (aUser.name !== autobot && user.id !== aUser.id) {
+                    votingResults.push(aUser.prompt(`${user.name} wants to watch ${videoStream.title}.\n\nPress 'OK' to accept the change, 'Cancel' to continue watching the current movie.` ));
+                }
+            }
+            this.ignoreClicks = true;
+            try {
+                const results = await promiseAllTimeout(votingResults, 15000) as DialogResponse[];
+                for(const result of results) {
+                    console.log(new Date(), "Voting Result", result);
+                    if (result && typeof result.submitted === 'boolean' &&  !result .submitted) {
+                        console.log(new Date(), `Change request by ${user.name} rejected.`);
+                        user.prompt("Your change request was rejected.\n\nPlease respect your fellow viewers' desire to continue watching the movie.");
+                        return false;
+                    }
+                }
+                const finalConfirmation = await user.prompt("Your change request was approved.\n\nPress 'OK' to continue, 'Cancel' to abort.");
+                if (!finalConfirmation?.submitted) {
+                    return false
+                }
+            } catch (error) {
+                console.error(error);
+                return false;
+            } finally {
+                this.ignoreClicks = false;
+            }
+        }
+        return true;
+    }
 }
+
