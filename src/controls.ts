@@ -33,6 +33,7 @@ export interface SynchronizedVideoStream {
 	uri: string;
 	photoArtifactId: string;
 	enabled: boolean;
+	title: string;
 }
 
 const headsetDevices = [

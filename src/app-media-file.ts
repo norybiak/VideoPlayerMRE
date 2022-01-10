@@ -7,6 +7,8 @@ import createVideoSelection, {playButtonLabel} from "./video-selection";
 import theme from './theme';
 import delay from "./delay";
 import Timeout = NodeJS.Timeout;
+import {DialogResponse} from "@microsoft/mixed-reality-extension-sdk/built/user/user";
+import {promiseAllTimeout} from "./promiseAllTimeout";
 
 const getButtonLabel =
     (actor: MRE.Actor) => actor.children.find(v => v.name === playButtonLabel);
@@ -19,6 +21,10 @@ const qualifiedPlayers = [
     'yxDuke-blue',
 ]
 const sbsArtifactId = '1902749595545371635';
+const sbsSmArtifactId = '1910479711725682700';
+const sbsMedArtifactId = '1910620162667578077';
+
+const testModeEnabled = true; // TODO: set to false in environment
 
 const hmsToSecondsOnly = (str = '') => {
     var p = str.split(':'),
@@ -36,20 +42,22 @@ type VideoStreamSelection = {
     syncVideoStream: SynchronizedVideoStream,
     videoStreamCard: MRE.Actor,
     playButton: MRE.Actor,
-}
+};
+
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
-    const url = "https://3d-sbs-videos.s3.amazonaws.com/3d-sbs-streams.json"; // TODO: config
+    const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
     return fetch(url).then(res => res.json()).then(v => {
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
-            if (v[key]?.enabled) {
-                newResult[key] = v[key]
+            if (v[key]?.enabled || (testModeEnabled && v[key]?.testMode)) {
+                newResult[key] = v[key];
             }
         }
         return newResult;
     });
-}
+};
 
+const autobot = 'BlueAutobot';
 export default class LiveStreamVideoPlayer {
 
     private userMediaInstanceMap: Record<string, UserMediaState>;
@@ -63,11 +71,13 @@ export default class LiveStreamVideoPlayer {
     private currentStreamTimer: Timeout;
     private playing = false;
     private streamCount = 0;
+    private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | string  = 'normal'
+    private ignoreClicks = false;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
     // private type: 'live' | 'file' = "file";
-    private mode: 'normal' | 'sbs' = "normal";
+    private mode: 'normal' | 'sbs'= "normal";
 
     constructor(private context: MRE.Context, private params: MRE.ParameterSet) {
         this.assets = new MRE.AssetContainer(context);
@@ -75,6 +85,7 @@ export default class LiveStreamVideoPlayer {
         if (params?.attach) {
             this.attach = true;
         }
+        this.sbsSize = params?.sz as string || 'normal';
         this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
         console.log(new Date(), 'MODE', this.mode);
         if (!this.isClientValid()) {
@@ -110,9 +121,21 @@ export default class LiveStreamVideoPlayer {
             await delay(2000);
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             const {root: vidStreamsRoot} = this.videoStreamSelections;
-            const {position, scale} = vidStreamsRoot.transform.local;
-            const vidStreamScaleFactor = 0.05;
-            position.z = -2.055;
+            const {position, scale, rotation } = vidStreamsRoot.transform.local;
+            let vidStreamScaleFactor = 0.05;
+            switch (this.sbsSize) {
+                case 'sm':
+                    position.z = -2.055;
+                    break;
+                case 'med':
+                    position.z = -1.775;
+                    position.x = -0.83;
+                    rotation.y = -90;
+                    vidStreamScaleFactor += 0.07
+                    break;
+                default:
+                    position.z = -2.055;
+            }
             position.y = 0.11;
             scale.x = vidStreamScaleFactor;
             scale.y = vidStreamScaleFactor;
@@ -247,8 +270,20 @@ export default class LiveStreamVideoPlayer {
             const rotation = MRE.Quaternion.FromEulerAngles(0, -Math.PI, 0);
             const sbsScale = 0.05620;
             // const sbsScale = 0.06;
+            let anSbsArtId;
+            switch (this.sbsSize) {
+                case 'sm':
+                    anSbsArtId = sbsSmArtifactId;
+                    break;
+                case 'med':
+                    anSbsArtId = sbsMedArtifactId;
+                    break;
+                default:
+                    anSbsArtId = sbsArtifactId;
+            }
+            console.log("Horace", this.sbsSize, anSbsArtId)
             const sbsActor = MRE.Actor.CreateFromLibrary(this.context, {
-                resourceId: `artifact:${sbsArtifactId}`,
+                resourceId: `artifact:${anSbsArtId}`,
                 actor: {
                     parentId: videoActor.id,
                     name: `test-sbs-${user.id}`,
@@ -398,14 +433,9 @@ export default class LiveStreamVideoPlayer {
                 // }));
                 buttonBehavior.onClick(async (user, actionData) => {
                     // TODO:  Check to see if video stopped or one player in room
-                    if (this.currentStream !== syncVideoStream.id) {
-                        console.log(this.videoStreams);
-                        console.log(new Date(), "Change requested", this.streamCount);
-                        // console.log("Horace", this.playing, this.streamCount, !user.properties['altspacevr-roles'].includes('moderator'), !!this.findUser('yxduke3'));
-                        if (this.playing
-                            && this.streamCount - (!!this.findUser('BlueAutobot') ? 1 : 0) > 1
-                            && !user.properties['altspacevr-roles'].includes('moderator')) {
-                            await user.prompt("Movie changes are not allowed with 2 or more viewers in the theater.  You may select a new movie after the current movie has ended.");
+                    if (this.currentStream !== syncVideoStream.id  && !this.ignoreClicks) {
+                        const canChangeVideo = await this.handleChangeUserRequest(user, syncVideoStream.id);
+                        if (!canChangeVideo) {
                             return;
                         }
 
@@ -429,4 +459,50 @@ export default class LiveStreamVideoPlayer {
             }
         }
     };
+
+    // If moderator, change movie
+    // Disable clicks after use makes a selection for n seconds
+// Iterate through all current viewers (do not worry recent joiners", add to mapping, and prompt user.  Do not prompt autobot
+// Generate promises, and iterate through the results
+// if any result is false, do not change, prevent user from clicking button again.
+// if yes change movie
+
+    private async handleChangeUserRequest(user: MRE.User, newVidStreamId: string) {
+        if (this.playing
+            && this.streamCount - (!!this.findUser('BlueAutobot') ? 1 : 0) > 1
+            && !user.properties['altspacevr-roles'].includes('moderator')) {
+            const confirmation = await user.prompt("Please wait 15 seconds for the current viewers to approve your movie change request.  Press 'OK' to continue, 'Cancel' to abort.");
+            if (!confirmation?.submitted) return false;
+            const votingResults: Promise<DialogResponse>[]= [];
+            const videoStream = this.videoStreams[newVidStreamId];
+            for(const aUser of this.context.users) {
+                if (aUser.name !== autobot && user.id !== aUser.id) {
+                    votingResults.push(aUser.prompt(`${user.name} wants to watch ${videoStream.title}.\n\nPress 'OK' to accept the change, 'Cancel' to continue watching the current movie.` ));
+                }
+            }
+            this.ignoreClicks = true;
+            try {
+                const results = await promiseAllTimeout(votingResults, 15000) as DialogResponse[];
+                for(const result of results) {
+                    console.log(new Date(), "Voting Result", result);
+                    if (result && typeof result.submitted === 'boolean' &&  !result .submitted) {
+                        console.log(new Date(), `Change request by ${user.name} rejected.`);
+                        user.prompt("Your change request was rejected.\n\nPlease respect your fellow viewers' desire to continue watching the movie.");
+                        return false;
+                    }
+                }
+                const finalConfirmation = await user.prompt("Your change request was approved.\n\nPress 'OK' to continue, 'Cancel' to abort.");
+                if (!finalConfirmation?.submitted) {
+                    return false
+                }
+            } catch (error) {
+                console.error(error);
+                return false;
+            } finally {
+                this.ignoreClicks = false;
+            }
+        }
+        return true;
+    }
 }
+
