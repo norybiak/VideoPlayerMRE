@@ -363,9 +363,9 @@ export default class LiveStreamVideoPlayer {
             );
         }
         const soundOptions: CustomSetVideoStateOptions = {
-            volume: 0.7,
+            volume: this.sbsSize === 'large' ? 1.0 : 0.7,
             spread: 0.0,
-            rolloffStartDistance: 24,
+            rolloffStartDistance: this.sbsSize === 'large' ? 20 : 24,
             muted: false,
         }
         const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
