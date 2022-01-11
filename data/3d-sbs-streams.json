@@ -2,11 +2,11 @@
   "10001":
   {
     "id": "10001",
-    "uri": "https://3d-sbs-videos.s3.amazonaws.com/Avatar+-+Full+Movie+Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Avatar.mp4",
     "duration": "02:36:14",
     "title": "Avatar",
     "photoArtifactId": "1909940032098010036",
-    "enabled": false
+    "enabled": true
   },
   "10002":
   {
@@ -24,7 +24,7 @@
     "duration": "01:56:59",
     "title": "Alita Battle Angel",
     "photoArtifactId": "1909940358993674493",
-    "enabled": true
+    "enabled": false
   },
   "10004":
   {
@@ -33,7 +33,7 @@
     "duration": "02:49:10",
     "title": "Avengers End Game",
     "photoArtifactId": "1909940576057295224",
-    "enabled": true
+    "enabled": false
   },
   "10005":
   {
@@ -51,7 +51,7 @@
     "duration": "01:58:05",
     "title": "Prometheus",
     "photoArtifactId": "1909943372668207709",
-    "enabled": false
+    "enabled": true
   },
   "10007":
   {
@@ -106,6 +106,36 @@
     "duration": "01:33:00",
     "title": "Skyscraper",
     "photoArtifactId": "1910547507851559546",
+    "enabled": false,
+    "testMode": false
+  },
+  "10013":
+  {
+    "id": "10013",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Dune_2021_3D_SBS.mp4",
+    "duration": "02:35:53",
+    "title": "Dune 2021",
+    "photoArtifactId": "1912134029310689751",
+    "enabled": true,
+    "testMode": false
+  },
+  "10014":
+  {
+    "id": "10014",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Star-Trek-Beyond.mp4",
+    "duration": "01:55:26",
+    "title": "Star Trek-Beyond",
+    "photoArtifactId": "1912134015419154887",
+    "enabled": true,
+    "testMode": false
+  },
+  "10015":
+  {
+    "id": "10015",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/X-Men-Apocalypse.mp4",
+    "duration": "02:19:09",
+    "title": "X-Men-Apocalypse",
+    "photoArtifactId": "1912134000604873147",
     "enabled": true,
     "testMode": false
   }

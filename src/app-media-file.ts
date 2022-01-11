@@ -23,8 +23,9 @@ const qualifiedPlayers = [
 const sbsArtifactId = '1902749595545371635';
 const sbsSmArtifactId = '1910479711725682700';
 const sbsMedArtifactId = '1910620162667578077';
+const sbsLargeArtifactId = '1912040755489145193';
 
-const testModeEnabled = true; // TODO: set to false in environment
+const testModeEnabled = false; // TODO: set to false in environment
 
 const hmsToSecondsOnly = (str = '') => {
     var p = str.split(':'),
@@ -43,9 +44,10 @@ type VideoStreamSelection = {
     videoStreamCard: MRE.Actor,
     playButton: MRE.Actor,
 };
-
+//
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
-    const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
+ // TODO: put back and make configurable   const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
+    const url = "http://192.168.2.35:8080/3d-sbs-streams.json"; // TODO: config
     return fetch(url).then(res => res.json()).then(v => {
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
@@ -71,7 +73,7 @@ export default class LiveStreamVideoPlayer {
     private currentStreamTimer: Timeout;
     private playing = false;
     private streamCount = 0;
-    private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | string  = 'normal'
+    private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | 'large' | string  = 'normal'
     private ignoreClicks = false;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
@@ -123,6 +125,7 @@ export default class LiveStreamVideoPlayer {
             const {root: vidStreamsRoot} = this.videoStreamSelections;
             const {position, scale, rotation } = vidStreamsRoot.transform.local;
             let vidStreamScaleFactor = 0.05;
+            position.y = 0.11;
             switch (this.sbsSize) {
                 case 'sm':
                     position.z = -2.055;
@@ -133,10 +136,14 @@ export default class LiveStreamVideoPlayer {
                     rotation.y = -90;
                     vidStreamScaleFactor += 0.07
                     break;
+                case 'large':
+                    position.z = -1.765;
+                    position.y = 0.04;
+                    vidStreamScaleFactor -= 0.02;
+                    break;
                 default:
                     position.z = -2.055;
             }
-            position.y = 0.11;
             scale.x = vidStreamScaleFactor;
             scale.y = vidStreamScaleFactor;
             scale.z = vidStreamScaleFactor;
@@ -277,6 +284,9 @@ export default class LiveStreamVideoPlayer {
                     break;
                 case 'med':
                     anSbsArtId = sbsMedArtifactId;
+                    break;
+                case 'large':
+                    anSbsArtId = sbsLargeArtifactId;
                     break;
                 default:
                     anSbsArtId = sbsArtifactId;
