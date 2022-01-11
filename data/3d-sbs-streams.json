@@ -24,7 +24,7 @@
     "duration": "01:56:59",
     "title": "Alita Battle Angel",
     "photoArtifactId": "1909940358993674493",
-    "enabled": false
+    "enabled": true
   },
   "10004":
   {
@@ -33,7 +33,7 @@
     "duration": "02:49:10",
     "title": "Avengers End Game",
     "photoArtifactId": "1909940576057295224",
-    "enabled": false
+    "enabled": true
   },
   "10005":
   {
@@ -136,6 +136,16 @@
     "duration": "02:19:09",
     "title": "X-Men-Apocalypse",
     "photoArtifactId": "1912134000604873147",
+    "enabled": true,
+    "testMode": false
+  },
+  "10016":
+  {
+    "id": "10016",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Wonder.Woman.1984-eng.mp4",
+    "duration": "02:31:07",
+    "title": "Wonder Woman 1984",
+    "photoArtifactId": "1912196619801985383",
     "enabled": true,
     "testMode": false
   }

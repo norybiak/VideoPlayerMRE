@@ -23,7 +23,7 @@ const qualifiedPlayers = [
 const sbsArtifactId = '1902749595545371635';
 const sbsSmArtifactId = '1910479711725682700';
 const sbsMedArtifactId = '1910620162667578077';
-const sbsLargeArtifactId = '1912040755489145193';
+const sbsLargeArtifactId = '1912736278097428990';
 
 const testModeEnabled = false; // TODO: set to false in environment
 
