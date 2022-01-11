@@ -46,8 +46,8 @@ type VideoStreamSelection = {
 };
 //
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
- // TODO: put back and make configurable   const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
-    const url = "http://192.168.2.35:8080/3d-sbs-streams.json"; // TODO: config
+    const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
+    // const url = "http://192.168.2.35:8080/3d-sbs-streams.json"; // TODO: config
     return fetch(url).then(res => res.json()).then(v => {
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
