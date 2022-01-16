@@ -136,6 +136,15 @@ const createVideoSelection = async (context: MRE.Context, parent: MRE.Actor, ass
                 name: "VideoSelectionRoot",
                 parentId: parent.id,
                 appearance: { enabled: false},
+                grabbable: true,
+                subscriptions: ["transform"],
+                // transform: { local: { rotation: { y: deck.flipped ? 9 : 0 } } },
+                collider: {
+                    geometry: {
+                        shape: MRE.ColliderType.Auto
+                    },
+                    isTrigger: true
+                },
                 transform: {
                     local: {
                         // rotation: MRE.Quaternion.FromEulerAngles(0, -Math.PI, 0)
