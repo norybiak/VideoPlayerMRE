@@ -139,7 +139,6 @@ export default class LiveStreamVideoPlayer {
 		// 			return;
 		// 		}
 		// }
-		console.log("Horace.streamId", streamId);
 		const streamScale = this.mode === 'sbs' ? 1 : 1;
 		const transform = {
 			local: {

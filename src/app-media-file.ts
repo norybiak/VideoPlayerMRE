@@ -9,6 +9,7 @@ import delay from "./delay";
 import Timeout = NodeJS.Timeout;
 import {DialogResponse} from "@microsoft/mixed-reality-extension-sdk/built/user/user";
 import {promiseAllTimeout} from "./promiseAllTimeout";
+import {retrieveSelectorTransformLocal, saveSelectorTransformLocal} from "./selector-persist-manager";
 
 const getButtonLabel =
     (actor: MRE.Actor) => actor.children.find(v => v.name === playButtonLabel);
@@ -20,12 +21,6 @@ const qualifiedPlayers = [
     'yxDuke-red',
     'yxDuke-blue',
 ]
-const sbsArtifactId = '1902749595545371635';
-const sbsSmArtifactId = '1910479711725682700';
-const sbsMedArtifactId = '1910620162667578077';
-const sbsLargeArtifactId = '1912736278097428990';
-
-const testModeEnabled = false; // TODO: set to false in environment
 
 const hmsToSecondsOnly = (str = '') => {
     var p = str.split(':'),
@@ -35,7 +30,6 @@ const hmsToSecondsOnly = (str = '') => {
         s += m * parseInt(p.pop(), 10);
         m *= 60;
     }
-
     return s;
 }
 
@@ -44,14 +38,13 @@ type VideoStreamSelection = {
     videoStreamCard: MRE.Actor,
     playButton: MRE.Actor,
 };
-//
+
 const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> => {
-    const url = "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/metadata/3d-sbs-streams.json"; // TODO: config
-    // const url = "http://192.168.2.35:8080/3d-sbs-streams.json"; // TODO: config
+    const url = process.env.VIDEO_DATA_URL;
     return fetch(url).then(res => res.json()).then(v => {
         const newResult: Record<string, SynchronizedVideoStream> = {};
         for(const key of Object.keys(v)) {
-            if (v[key]?.enabled || (testModeEnabled && v[key]?.testMode)) {
+            if (v[key]?.enabled || (process.env.TEST_MODE && v[key]?.testMode)) {
                 newResult[key] = v[key];
             }
         }
@@ -59,7 +52,6 @@ const fetchSyncStreams = (): Promise<Record<string, SynchronizedVideoStream>> =>
     });
 };
 
-const autobot = 'BlueAutobot';
 export default class LiveStreamVideoPlayer {
 
     private userMediaInstanceMap: Record<string, UserMediaState>;
@@ -73,8 +65,8 @@ export default class LiveStreamVideoPlayer {
     private currentStreamTimer: Timeout;
     private playing = false;
     private streamCount = 0;
-    private sbsSize: 'normal' | 'sm' | 'med' | 'wide' | 'large' | string  = 'normal'
     private ignoreClicks = false;
+    private vidSelectionTransform: MRE.ActorTransform;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -87,7 +79,6 @@ export default class LiveStreamVideoPlayer {
         if (params?.attach) {
             this.attach = true;
         }
-        this.sbsSize = params?.sz as string || 'normal';
         this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
         console.log(new Date(), 'MODE', this.mode);
         if (!this.isClientValid()) {
@@ -122,27 +113,30 @@ export default class LiveStreamVideoPlayer {
             this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
             await delay(2000);
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
+            this.videoStreamSelections.root.actorChanged()
             const {root: vidStreamsRoot} = this.videoStreamSelections;
+            vidStreamsRoot.onGrab("begin", (user, actionData) => {
+                this.vidSelectionTransform = vidStreamsRoot.transform;
+            })
+
+            vidStreamsRoot.onGrab("end", (user, actionData) => {
+                if(user.properties['altspacevr-roles'].includes('moderator')) {
+                    this.vidSelectionTransform = vidStreamsRoot.transform;
+                } else {
+                    vidStreamsRoot.transform = this.vidSelectionTransform;
+                }
+            })
+
             const {position, scale, rotation } = vidStreamsRoot.transform.local;
-            let vidStreamScaleFactor = 0.05;
-            position.y = 0.11;
-            switch (this.sbsSize) {
-                case 'sm':
-                    position.z = -2.055;
-                    break;
-                case 'med':
-                    position.z = -1.775;
-                    position.x = -0.83;
-                    rotation.y = -90;
-                    vidStreamScaleFactor += 0.07
-                    break;
-                case 'large':
-                    position.z = -1.765;
-                    position.y = 0.04;
-                    vidStreamScaleFactor -= 0.02;
-                    break;
-                default:
-                    position.z = -2.055;
+            const vidDeckTransform = retrieveSelectorTransformLocal(this.context);
+            const selectionSize = params?.sz as string || '1';
+            const vidStreamScaleFactor = 0.25 * parseFloat(selectionSize);
+            if (vidDeckTransform) {
+                vidStreamsRoot.transform = vidDeckTransform;
+            } else {
+                position.y = 0.11;
+                position.z = -2.055;
+                this.vidSelectionTransform = vidStreamsRoot.transform;
             }
             scale.x = vidStreamScaleFactor;
             scale.y = vidStreamScaleFactor;
@@ -158,6 +152,7 @@ export default class LiveStreamVideoPlayer {
             Object.values(this.userMediaInstanceMap).forEach(v => v.mediaInstance.stop());
             this.userMediaInstanceMap = {};
             clearTimeout(this.currentStreamTimer);
+            saveSelectorTransformLocal(this.context, this.vidSelectionTransform);
             console.log(new Date(), "App stopped", context.sessionId);
         })
     }
@@ -277,23 +272,8 @@ export default class LiveStreamVideoPlayer {
             const rotation = MRE.Quaternion.FromEulerAngles(0, -Math.PI, 0);
             const sbsScale = 0.05620;
             // const sbsScale = 0.06;
-            let anSbsArtId;
-            switch (this.sbsSize) {
-                case 'sm':
-                    anSbsArtId = sbsSmArtifactId;
-                    break;
-                case 'med':
-                    anSbsArtId = sbsMedArtifactId;
-                    break;
-                case 'large':
-                    anSbsArtId = sbsLargeArtifactId;
-                    break;
-                default:
-                    anSbsArtId = sbsArtifactId;
-            }
-            console.log("Horace", this.sbsSize, anSbsArtId)
             const sbsActor = MRE.Actor.CreateFromLibrary(this.context, {
-                resourceId: `artifact:${anSbsArtId}`,
+                resourceId: `artifact:${process.env.SBS_CAMERA_ARTIFACT_ID}`,
                 actor: {
                     parentId: videoActor.id,
                     name: `test-sbs-${user.id}`,
@@ -306,7 +286,7 @@ export default class LiveStreamVideoPlayer {
                         local: {
                             ...transform.local,
                             scale: {z: sbsScale, x: sbsScale, y: sbsScale},
-                            position: {x: 0.000, y: 0, z: 0.04},
+                            position: {x: 0.000, y: 0, z: 0.02},
                             rotation, //: { y: -100, z: 0, x: 0 }
                         }
                     },
@@ -363,9 +343,9 @@ export default class LiveStreamVideoPlayer {
             );
         }
         const soundOptions: CustomSetVideoStateOptions = {
-            volume: this.sbsSize === 'large' ? 1.0 : 0.7,
+            volume: 0.85,
             spread: 0.0,
-            rolloffStartDistance: this.sbsSize === 'large' ? 20 : 24,
+            rolloffStartDistance: 20,
             muted: false,
         }
         const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
@@ -486,7 +466,7 @@ export default class LiveStreamVideoPlayer {
             const votingResults: Promise<DialogResponse>[]= [];
             const videoStream = this.videoStreams[newVidStreamId];
             for(const aUser of this.context.users) {
-                if (aUser.name !== autobot && user.id !== aUser.id) {
+                if (aUser.name !== process.env.AUTO_BOT && user.id !== aUser.id) {
                     votingResults.push(aUser.prompt(`${user.name} wants to watch ${videoStream.title}.\n\nPress 'OK' to accept the change, 'Cancel' to continue watching the current movie.` ));
                 }
             }

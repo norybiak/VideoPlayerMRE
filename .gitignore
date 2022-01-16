@@ -8,3 +8,4 @@ built/
 .deployment
 *.blend1
 .idea/
+saved-data/

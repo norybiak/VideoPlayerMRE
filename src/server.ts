@@ -1,8 +1,11 @@
 import {log, Permissions, WebHost} from '@microsoft/mixed-reality-extension-sdk';
 import {resolve as resolvePath} from 'path';
 import LiveStreamVideoPlayer from './app';
-import SingleLiveStreamVideoPlayer from './app2';
+import dotenv from 'dotenv';
 import MediaFileTestPlayer from './app-media-file';
+
+// Read .env if file exists
+dotenv.config();
 
 log.enable('app');
 // log.enable('network');
