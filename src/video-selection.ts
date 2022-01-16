@@ -16,6 +16,16 @@ const createVideoCard = async (
     syncVideoStream: SynchronizedVideoStream,
     assetsContainer: MRE.AssetContainer
     ) => {
+    const tex = assetsContainer.createTexture(`photo-${syncVideoStream.id}`, {
+        uri: syncVideoStream.photoUrl
+    });
+
+    const mat = assetsContainer.createMaterial('blue', {
+        // color: MRE.Color3.Blue(),
+        mainTextureId: tex.id
+    });
+
+    const mesh = assetsContainer.createPlaneMesh(`plane-${syncVideoStream?.id}`, 1.0, 1.5);
     const base = MRE.Actor.Create(
         context, {
             actor: {
@@ -33,26 +43,51 @@ const createVideoCard = async (
     await base.created();
 
     console.log(new Date(), 'fetching resource-start', syncVideoStream.photoArtifactId);
-    const photo = MRE.Actor.CreateFromLibrary(context, {
-        resourceId: `artifact:${syncVideoStream.photoArtifactId}`,
+    const scaleFactor = 0.45;
+    const photo = MRE.Actor.Create(context, {
         actor: {
+            name: `photo-actor-${syncVideoStream.id}`,
             parentId: base.id,
-            name: `${syncVideoStream.photoArtifactId}-photo`,
-            // exclusiveToUser: user.id,
-            appearance: {enabled: true,},
-            // grabbable: true,
-            collider: {geometry: {shape: MRE.ColliderType.Auto},},
-            // transform: {
-            //     ...transform,
-            //     local: {
-            //         ...transform.local,
-            //         scale: {z: sbsScale, x: sbsScale, y: sbsScale},
-            //         position: {x: 0.000, y: 0, z: 0.04},
-            //         rotation, //: { y: -100, z: 0, x: 0 }
-            //     }
-            // },
+            appearance: {
+                meshId: mesh.id,
+                materialId: mat.id,
+            },
+            transform: {
+                local: {
+                    // position: { y: 1, z: -1 },
+                    rotation: { x: 0, y: 90, z: 90 },
+                    scale: {x: scaleFactor, y: scaleFactor, z: scaleFactor},
+                }
+            },
+            collider: {
+                geometry: {
+                    shape: MRE.ColliderType.Auto
+                },
+                isTrigger: true,
+            }
         }
     });
+
+    // const photo = MRE.Actor.CreateFromLibrary(context, {
+    //     resourceId: `artifact:${syncVideoStream.photoArtifactId}`,
+    //     actor: {
+    //         parentId: base.id,
+    //         name: `${syncVideoStream.photoArtifactId}-photo`,
+    //         // exclusiveToUser: user.id,
+    //         appearance: {enabled: true,},
+    //         // grabbable: true,
+    //         collider: {geometry: {shape: MRE.ColliderType.Auto},},
+    //         // transform: {
+    //         //     ...transform,
+    //         //     local: {
+    //         //         ...transform.local,
+    //         //         scale: {z: sbsScale, x: sbsScale, y: sbsScale},
+    //         //         position: {x: 0.000, y: 0, z: 0.04},
+    //         //         rotation, //: { y: -100, z: 0, x: 0 }
+    //         //     }
+    //         // },
+    //     }
+    // });
     console.log(new Date(), 'fetching resource-end');
     await delay(220);
     // await photo.created();
@@ -71,7 +106,7 @@ const createVideoCard = async (
                 },
                 transform: {
                     local: {
-                        position: { x: -0.122, y: -0.27, z: 0.0015 },
+                        position: { x: -0.112, y: -0.37, z: 0.0015 },
                         rotation: base.transform.local.rotation
                     }
                 },
@@ -110,7 +145,7 @@ const createVideoCard = async (
 
 const layoutCards = (root: MRE.Actor, videoStreamCards: MRE.Actor[]) => {
     let i = 0;
-    const MAX_COL = 6;
+    const MAX_COL = 10;
     let row = 0;
     const gridLayout = new MRE.PlanarGridLayout(root);
     for (const videoStreamCard of videoStreamCards) {
@@ -119,9 +154,9 @@ const layoutCards = (root: MRE.Actor, videoStreamCards: MRE.Actor[]) => {
         }
         gridLayout.addCell({
             row,
-            height: 0.72,
+            height: 0.77,
             column: row === 1 ? i % MAX_COL : (MAX_COL - 1) - (i % MAX_COL),
-            width: 0.56,
+            width: 0.52,
             contents: videoStreamCard
         });
         i++;

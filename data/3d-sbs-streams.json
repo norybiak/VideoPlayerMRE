@@ -6,6 +6,8 @@
     "duration": "02:57:55",
     "title": "Avatar",
     "photoArtifactId": "1909940032098010036",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10001_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10002":
@@ -15,6 +17,8 @@
     "duration": "02:32:52",
     "title": "Blade Runner 2049",
     "photoArtifactId": "1909769064423620897",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10002_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10003":
@@ -24,6 +28,8 @@
     "duration": "01:56:59",
     "title": "Alita Battle Angel",
     "photoArtifactId": "1909940358993674493",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10003_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10004":
@@ -33,6 +39,8 @@
     "duration": "02:49:10",
     "title": "Avengers End Game",
     "photoArtifactId": "1909940576057295224",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10004_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10005":
@@ -42,6 +50,8 @@
     "duration": "02:06:47",
     "title": "Black Panther",
     "photoArtifactId": "1909942976952402883",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10005_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10006":
@@ -51,6 +61,8 @@
     "duration": "01:58:05",
     "title": "Prometheus",
     "photoArtifactId": "1909943372668207709",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10006_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10007":
@@ -60,6 +72,8 @@
     "duration": "01:41:19",
     "title": "Rampage",
     "photoArtifactId": "1909943716215260002",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10007_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10008":
@@ -69,6 +83,8 @@
     "duration": "02:09:20",
     "title": "Ready Player One",
     "photoArtifactId": "1909944443675345633",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10008_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10009":
@@ -78,6 +94,8 @@
     "duration": "01:59:28",
     "title": "Spider Man: Farm from Home",
     "photoArtifactId": "1909944777399337880",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10009_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10010":
@@ -87,6 +105,8 @@
     "duration": "01:45:24",
     "title": "Spider Man: Into the Spider Verse",
     "photoArtifactId": "1909945186343977591",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10010_100.jpg",
+    "sbs": "half",
     "enabled": true
   },
   "10011":
@@ -96,6 +116,8 @@
     "duration": "02:00:50",
     "title": "Shazam",
     "photoArtifactId": "1910547460002939491",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10011_100.jpg",
+    "sbs": "half",
     "enabled": true,
     "testMode": false
   },
@@ -106,6 +128,8 @@
     "duration": "01:33:00",
     "title": "Skyscraper",
     "photoArtifactId": "1910547507851559546",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10012_100.jpg",
+    "sbs": "half",
     "enabled": false,
     "testMode": false
   },
@@ -116,6 +140,8 @@
     "duration": "02:35:53",
     "title": "Dune 2021",
     "photoArtifactId": "1912134029310689751",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10013_100.jpg",
+    "sbs": "half",
     "enabled": true,
     "testMode": false
   },
@@ -126,6 +152,8 @@
     "duration": "01:55:26",
     "title": "Star Trek-Beyond",
     "photoArtifactId": "1912134015419154887",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10014_100.jpg",
+    "sbs": "half",
     "enabled": true,
     "testMode": false
   },
@@ -136,6 +164,8 @@
     "duration": "02:19:09",
     "title": "X-Men-Apocalypse",
     "photoArtifactId": "1912134000604873147",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10015_100.jpg",
+    "sbs": "half",
     "enabled": true,
     "testMode": false
   },
@@ -146,6 +176,32 @@
     "duration": "02:31:07",
     "title": "Wonder Woman 1984",
     "photoArtifactId": "1912196619801985383",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10016_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false
+  },
+  "10017":
+  {
+    "id": "10017",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Tron-Legacy-2010-enhanced.mp4",
+    "duration": "02:05:07",
+    "title": "Tron Legacy 2010",
+    "photoArtifactId": "1916217928072560854",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10017_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false
+  },
+  "10018":
+  {
+    "id": "10018",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Edge-of-tomorrow-enhanced.mp4",
+    "duration": "01:53:29",
+    "title": "Edge of Tomorrow",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10018_100.jpg",
+    "sbs": "half",
     "enabled": true,
     "testMode": false
   }

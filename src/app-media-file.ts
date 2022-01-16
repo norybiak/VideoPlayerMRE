@@ -115,6 +115,7 @@ export default class LiveStreamVideoPlayer {
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             this.videoStreamSelections.root.actorChanged()
             const {root: vidStreamsRoot} = this.videoStreamSelections;
+            vidStreamsRoot.grabbable = !!params?.grab || false;
             vidStreamsRoot.onGrab("begin", (user, actionData) => {
                 this.vidSelectionTransform = vidStreamsRoot.transform;
             })

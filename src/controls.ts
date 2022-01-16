@@ -32,6 +32,8 @@ export interface SynchronizedVideoStream {
 	duration: string;
 	uri: string;
 	photoArtifactId: string;
+	photoUrl: string;
+	sbs: "half" | "full";
 	enabled: boolean;
 	title: string;
 }

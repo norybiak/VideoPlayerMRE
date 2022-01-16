@@ -25,7 +25,7 @@ const theme = {
 			},
 			disable: {
 				text: MRE.Color3.DarkGray(),
-				background: MRE.Color3.White(),
+				background: MRE.Color3.Green(),
 			},
 			hover: {
 				text: MRE.Color3.FromHexString('#3333330'),
