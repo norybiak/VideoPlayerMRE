@@ -148,5 +148,26 @@
     "photoArtifactId": "1912196619801985383",
     "enabled": true,
     "testMode": false
+  },
+  "10017":
+  {
+    "id": "10017",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Tron-Legacy-2010-enhanced.mp4",
+    "duration": "02:05:07",
+    "title": "Tron Legacy 2010",
+    "photoArtifactId": "1916217928072560854",
+    "enabled": true,
+    "testMode": false
+  },
+  "10018":
+  {
+    "id": "10018",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Edge-of-tomorrow-enhanced.mp4",
+    "duration": "01:53:29",
+    "title": "Edge of Tomorrow",
+    "photoArtifactId": "1916314865157275803",
+    "enabled": true,
+    "testMode": false
   }
+  
 }
