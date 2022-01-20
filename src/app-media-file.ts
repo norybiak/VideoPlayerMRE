@@ -306,7 +306,7 @@ export default class LiveStreamVideoPlayer {
     // TODO: Refactor
     private async stopAllMediaInstanceVideoStreams() {
         console.log(new Date(), "Stopping All Media Instances")
-        await this.stopRollingM3m8Manifest();
+//        await this.stopRollingM3m8Manifest();
         for (const userMediaInstance of Object.values(this.userMediaInstanceMap)) {
             userMediaInstance.mediaInstance.stop()
             console.log(new Date(), "Stopped Video Stream for", userMediaInstance.user.name);
@@ -473,6 +473,7 @@ export default class LiveStreamVideoPlayer {
                             currentLabel.text.contents = 'Play';
                             currentPlayButton.appearance.material.color = MRE.Color4.FromColor3(defaultColor.background);
                         }
+                        await this.stopRollingM3m8Manifest();
                         this.currentStream = syncVideoStream.id;
                         clearTimeout(this.currentStreamTimer);
                         this.stopAllMediaInstanceVideoStreams();
@@ -540,7 +541,7 @@ export default class LiveStreamVideoPlayer {
                         'x-mre-session': this.getSessionId()
                     }
                 });
-                console.log(new Date(), response);
+                console.log(new Date(), response.data);
             } catch (err) {
                 console.error("Could not stop rolling m3u8", err);
             } finally {
@@ -550,4 +551,3 @@ export default class LiveStreamVideoPlayer {
     }
 
 }
-

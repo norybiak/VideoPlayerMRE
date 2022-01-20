@@ -2,13 +2,14 @@
   "10001":
   {
     "id": "10001",
-    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Avatar.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/avatar2018/hls/index.m3u8",
     "duration": "02:57:55",
     "title": "Avatar",
     "photoArtifactId": "1909940032098010036",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10001_100.jpg",
     "sbs": "half",
-    "enabled": true
+    "enabled": true,
+    "rollingM3u8ManifestEnabled": true
   },
   "10002":
   {
@@ -74,18 +75,19 @@
     "photoArtifactId": "1909943716215260002",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10007_100.jpg",
     "sbs": "half",
-    "enabled": true
+    "enabled": false
   },
   "10008":
   {
     "id": "10008",
-    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Ready%20Player%20One%20-%20Full%20Movie%20Online.mp4",
+    "uri": "https://3d-vr.nyc3.digitaloceanspaces.com/media/readyplayerone/hls/1080_out.m3u8",
     "duration": "02:09:20",
     "title": "Ready Player One",
     "photoArtifactId": "1909944443675345633",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10008_100.jpg",
     "sbs": "half",
-    "enabled": true
+    "enabled": true,
+    "rollingM3u8ManifestEnabled": true
   },
   "10009":
   {
@@ -101,13 +103,14 @@
   "10010":
   {
     "id": "10010",
-    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Spider-Man%20Into%20the%20Spider-Verse%20-%20Full%20Movie%20Online.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/spider-verse/hls/index.m3u8",
     "duration": "01:45:24",
     "title": "Spider Man: Into the Spider Verse",
     "photoArtifactId": "1909945186343977591",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10010_100.jpg",
     "sbs": "half",
-    "enabled": true
+    "enabled": true,
+    "rollingM3u8ManifestEnabled": true
   },
   "10011":
   {
@@ -232,13 +235,14 @@
   "10021":
   {
     "id": "10021",
-    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Aquaman-2018-enhanced.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/aquaman/hls/index.m3u8",
     "duration": "02:23:21",
     "title": "Aquaman 2018",
     "photoArtifactId": "1916314865157275803",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10021_100.jpg",
     "sbs": "half",
     "enabled": true,
-    "testMode": false
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
   }
 }
