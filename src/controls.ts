@@ -36,6 +36,7 @@ export interface SynchronizedVideoStream {
 	sbs: "half" | "full";
 	enabled: boolean;
 	title: string;
+	rollingM3u8ManifestEnabled?: boolean;
 }
 
 const headsetDevices = [

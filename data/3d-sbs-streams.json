@@ -204,5 +204,41 @@
     "sbs": "half",
     "enabled": true,
     "testMode": false
+  },
+  "10019":
+  {
+    "id": "10019",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Tomb-Raider-single-audio-enhanced.mp4",
+    "duration": "01:52:42",
+    "title": "Tomb Raider",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10019_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false
+  },
+  "10020":
+  {
+    "id": "10020",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Star-wars-solo.mp4",
+    "duration": "02:06:17",
+    "title": "Solo - A Star Wars Story",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10020_100.jpg",
+    "sbs": "half",
+    "enabled": false,
+    "testMode": false
+  },
+  "10021":
+  {
+    "id": "10021",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Aquaman-2018-enhanced.mp4",
+    "duration": "02:23:21",
+    "title": "Aquaman 2018",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10021_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false
   }
 }

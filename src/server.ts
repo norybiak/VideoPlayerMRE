@@ -22,6 +22,8 @@ const server = new WebHost({
    // port: 3901,
 });
 
+server.adapter
+
 // Handle new application sessions
 server.adapter.onConnection((context, params) => {
    console.log("Starting params", params)
