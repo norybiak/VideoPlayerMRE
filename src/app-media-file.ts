@@ -1,5 +1,6 @@
 import * as MRE from '@microsoft/mixed-reality-extension-sdk';
 import {ColliderType} from '@microsoft/mixed-reality-extension-sdk';
+import axios from 'axios';
 import {CustomSetVideoStateOptions, showControls, SynchronizedVideoStream, UserMediaState} from './controls';
 import fetch from 'node-fetch';
 import block from "./block";
@@ -67,6 +68,7 @@ export default class LiveStreamVideoPlayer {
     private streamCount = 0;
     private ignoreClicks = false;
     private vidSelectionTransform: MRE.ActorTransform;
+    private startingRollingM3m8Manifest = false;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -98,18 +100,21 @@ export default class LiveStreamVideoPlayer {
             } else {
                 this.currentStream = Object.keys(this.videoStreams)?.[0];
             }
-            if (this.currentStream) {
-                const vstream = this.videoStreams[this.currentStream];
-                console.log(new Date(), 'Playing default stream', vstream);
-                vstream.videoStream = this.assets.createVideoStream(
-                    this.currentStream,
-                    {
-                        uri: this.videoStreams[this.currentStream].uri,
-                    }
-                );
-            } else {
-                throw Error("Video Stream data not loaded")
-            }
+            // Removed so we start always in the same place
+            // if (this.currentStream) {
+            //     const vstream = this.videoStreams[this.currentStream];
+            //     console.log(new Date(), 'Playing default stream', vstream);
+            //     vstream.videoStream = this.assets.createVideoStream(
+            //         this.currentStream,
+            //         {
+            //             // Compute Video Stream
+            //             uri: this.videoStreams[this.currentStream].uri,
+            //             duration: 99999999,
+            //         }
+            //     );
+            // } else {
+            //     throw Error("Video Stream data not loaded")
+            // }
             this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
             await delay(2000);
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
@@ -299,8 +304,9 @@ export default class LiveStreamVideoPlayer {
     }
 
     // TODO: Refactor
-    private stopAllMediaInstanceVideoStreams() {
+    private async stopAllMediaInstanceVideoStreams() {
         console.log(new Date(), "Stopping All Media Instances")
+        await this.stopRollingM3m8Manifest();
         for (const userMediaInstance of Object.values(this.userMediaInstanceMap)) {
             userMediaInstance.mediaInstance.stop()
             console.log(new Date(), "Stopped Video Stream for", userMediaInstance.user.name);
@@ -328,7 +334,20 @@ export default class LiveStreamVideoPlayer {
         }
     }
 
-    private CreateStreamInstance(parentActor: MRE.Actor, user: MRE.User, ignoreControls = false) {
+    private getStreamUrl(videoStream: SynchronizedVideoStream): MRE.VideoStream {
+        let uri = videoStream.uri;
+        if (videoStream.rollingM3u8ManifestEnabled) {
+            uri = `${process.env.ROLLING_M3M8_MANIFEST_URL}/roll/${this.currentStream}/${this.getSessionId()}/index.m3u8`;
+            console.log("Horace", uri)
+        }
+        return this.assets.createVideoStream(
+            this.currentStream,
+            {
+                uri,
+            }
+        );;
+    }
+    private async CreateStreamInstance(parentActor: MRE.Actor, user: MRE.User, ignoreControls = false) {
         // if (this.userMediaInstanceMap[user.id.toString()]) {
         // 	this.userMediaInstanceMap[user.id.toString()].mediaInstance.stop();
         // }
@@ -336,12 +355,7 @@ export default class LiveStreamVideoPlayer {
         if (!aVideoStream.videoStream) {
             this.streamCount = 0;
             aVideoStream.startTime = aVideoStream.startTime && aVideoStream.startTime > 0 ? aVideoStream.startTime : -1;
-            aVideoStream.videoStream = this.assets.createVideoStream(
-                this.currentStream,
-                {
-                    uri: aVideoStream.uri,
-                }
-            );
+            aVideoStream.videoStream = this.getStreamUrl(aVideoStream);
         }
         const soundOptions: CustomSetVideoStateOptions = {
             volume: 0.85,
@@ -350,10 +364,30 @@ export default class LiveStreamVideoPlayer {
             muted: false,
         }
         const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
+        // Block here if anyone is starting remote Stream
+        if (aVideoStream.rollingM3u8ManifestEnabled) {
+            await block( () => !this.startingRollingM3m8Manifest);
+        }
         if (aVideoStream?.startTime > 0) {
             soundOptions.time = getRunningTime();
         } else {
+            // First one to start Stream, in
             aVideoStream.startTime = Date.now();
+            if (aVideoStream.rollingM3u8ManifestEnabled) {
+                // We need to start rolling
+                this.startingRollingM3m8Manifest = true;
+                const rollingManifestUrl = `${process.env.ROLLING_M3M8_MANIFEST_URL}/start/${this.currentStream}`;
+                try {
+                    const response = await axios.get(rollingManifestUrl, { headers: {
+                            'x-mre-session': this.getSessionId()
+                        }});
+                }  catch (err) {
+                    console.error("Could not start rolling m3u8", this.currentStream, err.message);
+                    return; // Do not process any further so
+                } finally {
+                    this.startingRollingM3m8Manifest = false;
+                }
+            }
             this.streamCount = 0;
             this.playing = true;
             this.currentStreamTimer = setTimeout(() => {
@@ -495,5 +529,25 @@ export default class LiveStreamVideoPlayer {
         }
         return true;
     }
+    private getSessionId() { return  new Buffer(this.context.sessionId).toString('base64') ; }
+
+    private async stopRollingM3m8Manifest() {
+        if (this.videoStreams[this.currentStream].rollingM3u8ManifestEnabled) {
+            const rollingManifestUrl = `${process.env.ROLLING_M3M8_MANIFEST_URL}/stop/${this.currentStream}`;
+            try {
+                const response = await axios.get(rollingManifestUrl, {
+                    headers: {
+                        'x-mre-session': this.getSessionId()
+                    }
+                });
+                console.log(new Date(), response);
+            } catch (err) {
+                console.error("Could not stop rolling m3u8", err);
+            } finally {
+                this.startingRollingM3m8Manifest = false;
+            }
+        }
+    }
+
 }
 
