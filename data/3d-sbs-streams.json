@@ -244,5 +244,18 @@
     "enabled": true,
     "testMode": false,
     "rollingM3u8ManifestEnabled": true
+  },
+  "10022":
+  {
+    "id": "10022",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/mortal-combat/hls/index.m3u8",
+    "duration": "01:50:01",
+    "title": "Mortal Kombat",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10022_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
   }
 }

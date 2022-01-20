@@ -30,6 +30,7 @@
     "typescript": "^3.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.47.1",
     "@microsoft/gltf-gen": "^0.21.0",
     "@microsoft/mixed-reality-extension-sdk": "^0.20.0",
     "@types/node": "^14.0.13",

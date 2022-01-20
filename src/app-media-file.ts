@@ -81,7 +81,7 @@ export default class LiveStreamVideoPlayer {
         if (params?.attach) {
             this.attach = true;
         }
-        this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
+        this.mode = (params?.mode as 'normal' | 'sbs') || (process.env.mode as 'normal' | 'sbs')  || 'normal';
         console.log(new Date(), 'MODE', this.mode);
         if (!this.isClientValid()) {
             return;
@@ -134,7 +134,7 @@ export default class LiveStreamVideoPlayer {
             })
 
             const {position, scale, rotation } = vidStreamsRoot.transform.local;
-            const vidDeckTransform = retrieveSelectorTransformLocal(this.context);
+            const vidDeckTransform = await retrieveSelectorTransformLocal(this.context);
             const selectionSize = params?.sz as string || '1';
             const vidStreamScaleFactor = 0.25 * parseFloat(selectionSize);
             if (vidDeckTransform) {
