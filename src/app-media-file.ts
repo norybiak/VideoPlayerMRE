@@ -71,6 +71,7 @@ export default class LiveStreamVideoPlayer {
     private startingRollingM3m8Manifest = false;
     private rolloffStartDistance = 20;
     private loadingLabel: MRE.Actor;
+    private loaderVideo: MRE.VideoStream;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -89,6 +90,13 @@ export default class LiveStreamVideoPlayer {
             console.log(new Date(), "App started:", context.sessionId);
             this.userMediaInstanceMap = {};
             // Load data file, and then default stream
+            this.loaderVideo = this.assets.createVideoStream(
+                "loader-video",
+                {
+                    uri: "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/loading.mp4" // change
+                }
+            );;
+
             this.videoStreams = await fetchSyncStreams();
             console.log(new Date(), "Loaded Video Stream data", this.videoStreams);
             if (params?.vc || params?.fc) {
@@ -321,7 +329,6 @@ export default class LiveStreamVideoPlayer {
         let uri = videoStream.uri;
         if (videoStream.rollingM3u8ManifestEnabled) {
             uri = `${process.env.ROLLING_M3M8_MANIFEST_URL}/roll/${this.currentStream}/${this.getSessionId()}/index.m3u8`;
-            console.log("Horace", uri)
         }
         return this.assets.createVideoStream(
             this.currentStream,
@@ -380,6 +387,14 @@ export default class LiveStreamVideoPlayer {
                 hmsToSecondsOnly(aVideoStream.duration) * 1000);
         }
         this.streamCount++;
+
+        this.ignoreClicks = true;
+        try {
+            await this.showLoading(parentActor, soundOptions);
+        } finally {
+            this.ignoreClicks = false;
+        }
+        // await delay(120);
         const mediaInstance = parentActor.startVideoStream(aVideoStream?.videoStream?.id, soundOptions);
         console.log(new Date(), "Stream Started:", user.id, user.name, this.currentStream);
 
@@ -534,7 +549,6 @@ export default class LiveStreamVideoPlayer {
     }
 
     async showLoaderLabel(vidDeckTransform: MRE.ActorTransform) {
-        console.log("Horace", vidDeckTransform);
         let transform = { };
         if (vidDeckTransform) {
             transform = {
@@ -548,7 +562,6 @@ export default class LiveStreamVideoPlayer {
                 },
             }
         }
-        console.log("Horace.after", transform);
         this.loadingLabel = MRE.Actor.Create(this.context, {
             actor: {
                 name: "loader-label",
@@ -565,5 +578,15 @@ export default class LiveStreamVideoPlayer {
         });
         return this.loadingLabel.created();
 
+    }
+
+    async showLoading(parentActor: MRE.Actor, soundOptions: MRE.SetVideoStateOptions): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const mediaInstance = parentActor.startVideoStream(this.loaderVideo.id, soundOptions);
+            setTimeout(() => {
+                mediaInstance.stop()
+                resolve();
+            }, 2000);
+        })
     }
 }

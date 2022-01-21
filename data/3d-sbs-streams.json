@@ -187,14 +187,15 @@
   "10017":
   {
     "id": "10017",
-    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/Tron-Legacy-2010-enhanced.mp4",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/tron-legacy/hls/index.m3u8",
     "duration": "02:05:07",
     "title": "Tron Legacy 2010",
     "photoArtifactId": "1916217928072560854",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10017_100.jpg",
     "sbs": "half",
     "enabled": true,
-    "testMode": false
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
   },
   "10018":
   {
@@ -331,6 +332,19 @@
     "title": "I-Robot",
     "photoArtifactId": "1916314865157275803",
     "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10029_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10030":
+  {
+    "id": "10030",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/ghost-in-shell/hls/index.m3u8",
+    "duration": "01:46:56",
+    "title": "Ghost in Shell",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10030_100.jpg",
     "sbs": "half",
     "enabled": true,
     "testMode": false,
