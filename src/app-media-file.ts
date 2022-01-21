@@ -70,6 +70,7 @@ export default class LiveStreamVideoPlayer {
     private vidSelectionTransform: MRE.ActorTransform;
     private startingRollingM3m8Manifest = false;
     private rolloffStartDistance = 20;
+    private loadingLabel: MRE.Actor;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -111,8 +112,22 @@ export default class LiveStreamVideoPlayer {
             // } else {
             //     throw Error("Video Stream data not loaded")
             // }
-            this.root = MRE.Actor.Create(this.context, {actor: {name: 'bigscreen-Root'}});
+            const scaleFactor = 2.741;
+            this.root = MRE.Actor.Create(this.context, {
+                actor: {
+                    name: `3d-bigscreen-Root`,
+                    transform: {
+                        local: {
+                            scale: { x: scaleFactor, y: scaleFactor, z: scaleFactor }
+                        }
+                    }
+                }
+            });
+            const vidDeckTransform = await retrieveSelectorTransformLocal(this.context);
+            // Add loader Actor
+            await this.showLoaderLabel(vidDeckTransform);
             await delay(2000);
+
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             this.videoStreamSelections.root.actorChanged()
             const {root: vidStreamsRoot} = this.videoStreamSelections;
@@ -130,7 +145,6 @@ export default class LiveStreamVideoPlayer {
             })
 
             const {position, scale, rotation } = vidStreamsRoot.transform.local;
-            const vidDeckTransform = await retrieveSelectorTransformLocal(this.context);
             const selectionSize = params?.sz as string || '1';
             const vidStreamScaleFactor = 0.25 * parseFloat(selectionSize);
             if (vidDeckTransform) {
@@ -144,6 +158,8 @@ export default class LiveStreamVideoPlayer {
             scale.y = vidStreamScaleFactor;
             scale.z = vidStreamScaleFactor;
             await delay(2000);
+            // Remove loader Actor
+            this.loadingLabel?.destroy();
             vidStreamsRoot.appearance.enabled = true;
             this.initialized = true;
         });
@@ -517,4 +533,37 @@ export default class LiveStreamVideoPlayer {
         }
     }
 
+    async showLoaderLabel(vidDeckTransform: MRE.ActorTransform) {
+        console.log("Horace", vidDeckTransform);
+        let transform = { };
+        if (vidDeckTransform) {
+            transform = {
+                ...vidDeckTransform,
+                app: {},
+                local: {
+                    ...vidDeckTransform?.local,
+                    scale: {...vidDeckTransform?.local?.scale},
+                    position: {...vidDeckTransform?.local?.position},
+                    rotation: {...vidDeckTransform?.local?.rotation, y: 90 }
+                },
+            }
+        }
+        console.log("Horace.after", transform);
+        this.loadingLabel = MRE.Actor.Create(this.context, {
+            actor: {
+                name: "loader-label",
+                parentId: this.root.id,
+                transform,
+                text: {
+                    contents: "Loading...",
+                    pixelsPerLine: 12,
+                    height: 0.245,
+                    anchor: MRE.TextAnchorLocation.MiddleCenter,
+                    color: MRE.Color3.White(),
+                }
+            }
+        });
+        return this.loadingLabel.created();
+
+    }
 }
