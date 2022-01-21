@@ -27,7 +27,7 @@ server.adapter
 // Handle new application sessions
 server.adapter.onConnection((context, params) => {
    console.log("Starting params", params)
-   if (params?.type as 'live' | 'file' === 'live') {
+   if (params?.type as 'live' | 'file' === 'live' || process.env.type === 'live') {
       return new LiveStreamVideoPlayer(context, params);
    }
    return new MediaFileTestPlayer(context, params);
