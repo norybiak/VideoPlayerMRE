@@ -69,6 +69,7 @@ export default class LiveStreamVideoPlayer {
     private ignoreClicks = false;
     private vidSelectionTransform: MRE.ActorTransform;
     private startingRollingM3m8Manifest = false;
+    private rolloffStartDistance = 20;
     private videoStreamSelections: {
         root: MRE.Actor, videoStreamCardsMapping: Record<string, VideoStreamSelection>
     };
@@ -94,6 +95,7 @@ export default class LiveStreamVideoPlayer {
             } else {
                 this.currentStream = Object.keys(this.videoStreams)?.[0];
             }
+            this.rolloffStartDistance = parseInt(params?.roff as string, 10) || 20;
             // Removed so we start always in the same place
             // if (this.currentStream) {
             //     const vstream = this.videoStreams[this.currentStream];
@@ -323,9 +325,9 @@ export default class LiveStreamVideoPlayer {
             aVideoStream.videoStream = this.getStreamUrl(aVideoStream);
         }
         const soundOptions: CustomSetVideoStateOptions = {
-            volume: 0.85,
+            volume: 1,
             spread: 0.0,
-            rolloffStartDistance: 20,
+            rolloffStartDistance: this.rolloffStartDistance,
             muted: false,
         }
         const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
