@@ -81,15 +81,9 @@ export default class LiveStreamVideoPlayer {
         if (params?.attach) {
             this.attach = true;
         }
-        this.mode = (params?.mode as 'normal' | 'sbs') || 'normal';
+        this.mode = (params?.mode as 'normal' | 'sbs') || (process.env.mode as 'normal' | 'sbs')  || 'normal';
         console.log(new Date(), 'MODE', this.mode);
-        if (!this.isClientValid()) {
-            return;
-        }
         this.context.onStarted(async () => {
-            if (!this.isClientValid()) {
-                return;
-            }
             console.log(new Date(), "App started:", context.sessionId);
             this.userMediaInstanceMap = {};
             // Load data file, and then default stream
@@ -120,7 +114,7 @@ export default class LiveStreamVideoPlayer {
             this.videoStreamSelections = await createVideoSelection(this.context, this.root, this.assets, this.videoStreams);
             this.videoStreamSelections.root.actorChanged()
             const {root: vidStreamsRoot} = this.videoStreamSelections;
-            vidStreamsRoot.grabbable = !!params?.grab || false;
+            vidStreamsRoot.grabbable = params?.grab?.toLocaleString() === 'y' || false;
             vidStreamsRoot.onGrab("begin", (user, actionData) => {
                 this.vidSelectionTransform = vidStreamsRoot.transform;
             })
@@ -134,7 +128,7 @@ export default class LiveStreamVideoPlayer {
             })
 
             const {position, scale, rotation } = vidStreamsRoot.transform.local;
-            const vidDeckTransform = retrieveSelectorTransformLocal(this.context);
+            const vidDeckTransform = await retrieveSelectorTransformLocal(this.context);
             const selectionSize = params?.sz as string || '1';
             const vidStreamScaleFactor = 0.25 * parseFloat(selectionSize);
             if (vidDeckTransform) {
@@ -174,39 +168,13 @@ export default class LiveStreamVideoPlayer {
         return null;
     }
 
-    private isClientValid() {
-        for (const player of qualifiedPlayers) {
-            if (this.context.sessionId.indexOf(player) !== -1) {
-                return true;
-            }
-        }
-        if (!qualifiedPlayers.includes(this.context.sessionId)) {
-            console.log(new Date(), "Rejected unknown player", this.context.sessionId);
-            return false;
-        }
-        return false;
-    }
-
     private async handleUserJoined(user: MRE.User) {
         await block(() => this.initialized, 15000);
-        if (!this.isClientValid()) {
-            return;
-        }
         console.log(
             new Date(),
             "User Joined:", user.id, user.name,
             "Device:", user.properties['device-model'],
             'Roles:', user.properties['altspacevr-roles'] || 'none');
-        if (!this.canViewPlayer(user, 'moderator')) {
-            this.modeNoNewJoins = true;
-            console.log(new Date(), `User ${user.name} blocked`);
-            return;
-        }
-        if (!this.canViewPlayer(user, 'helper')) {
-            // this.modeNoNewJoins = true;
-            console.log(new Date(), `User ${user.name} blocked`);
-            return;
-        }
         await this.init(user);
         this.attachPlayButtonBehaviors();
     }
@@ -235,9 +203,6 @@ export default class LiveStreamVideoPlayer {
     }
 
     private handleUserLeft(user: MRE.User) {
-        if (!this.isClientValid()) {
-            return;
-        }
         console.log(new Date(), "User Left:", user.id, user.name);
         this.cleanupUser(user);
     }
