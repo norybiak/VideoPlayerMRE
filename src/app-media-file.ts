@@ -327,7 +327,7 @@ export default class LiveStreamVideoPlayer {
         const soundOptions: CustomSetVideoStateOptions = {
             volume: 1,
             spread: 0.0,
-            rolloffStartDistance: this.rolloffStartDistance,
+            rolloffStartDistance: 100,  //this.rolloffStartDistance,
             muted: false,
         }
         const getRunningTime = () => Math.round(Date.now() - aVideoStream.startTime) / 1000;
