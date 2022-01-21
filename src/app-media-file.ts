@@ -326,7 +326,7 @@ export default class LiveStreamVideoPlayer {
         }
         const soundOptions: CustomSetVideoStateOptions = {
             volume: 1,
-            spread: 0.0,
+            spread: 1.0,
             rolloffStartDistance: 100,  //this.rolloffStartDistance,
             muted: false,
         }
