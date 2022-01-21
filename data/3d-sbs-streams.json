@@ -257,5 +257,83 @@
     "enabled": true,
     "testMode": false,
     "rollingM3u8ManifestEnabled": true
+  },
+  "10024":
+  {
+    "id": "10024",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/iron-mask/hls/index.m3u8",
+    "duration": "02:00:39",
+    "title": "The Iron Mask",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10024_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10025":
+  {
+    "id": "10025",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/soul/hls/index.m3u8",
+    "duration": "01:40:31",
+    "title": "Soul",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10025_100.jpg",
+    "sbs": "half",
+    "enabled": false,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10026":
+  {
+    "id": "10026",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/tenet/hls/index.m3u8",
+    "duration": "02:30:09",
+    "title": "Tenet",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10026_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10027":
+  {
+    "id": "10027",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/mulan/hls/index.m3u8",
+    "duration": "01:55:11",
+    "title": "Mulan",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10027_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10028":
+  {
+    "id": "10028",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/titanic/hls/index.m3u8",
+    "duration": "01:47:58",
+    "title": "Titanic",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10028_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
+  },
+  "10029":
+  {
+    "id": "10029",
+    "uri": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media/i-robot/hls/index.m3u8",
+    "duration": "01:54:44",
+    "title": "I-Robot",
+    "photoArtifactId": "1916314865157275803",
+    "photoUrl": "https://3d-vr.nyc3.cdn.digitaloceanspaces.com/media-images/10029_100.jpg",
+    "sbs": "half",
+    "enabled": true,
+    "testMode": false,
+    "rollingM3u8ManifestEnabled": true
   }
 }
