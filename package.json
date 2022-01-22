@@ -36,7 +36,7 @@
     "@types/pg-format": "^1.0.1",
     "dotenv": "^8.2.0",
     "get-video-duration": "^3.0.1",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^3.1.1",
     "pg": "^8.5.1",
     "pg-format": "^1.0.4",
     "twitch-get-stream": "^0.6.0",
